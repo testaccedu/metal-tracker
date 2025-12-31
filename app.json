@@ -1,0 +1,29 @@
+{
+  "name": "Metal Tracker",
+  "description": "API zum Verwalten deines Edelmetall-Portfolios (Gold, Silber, Platin, Palladium)",
+  "repository": "https://github.com/your-username/metal-tracker",
+  "stack": "heroku-24",
+  "env": {
+    "METALS_API_KEY": {
+      "description": "API Key fuer metals.dev (optional, Fallback-Preise verfuegbar)",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    "heroku-postgresql:essential-0"
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "scripts": {
+    "postdeploy": "alembic upgrade head"
+  }
+}
