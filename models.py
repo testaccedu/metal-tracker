@@ -27,6 +27,7 @@ class User(Base):
 
     # Relationships
     positions = relationship("Position", back_populates="user", cascade="all, delete-orphan")
+    api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
 
 
 class Position(Base):
@@ -69,3 +70,21 @@ class PortfolioSnapshot(Base):
     total_weight_palladium_g = Column(Float, default=0)
     positions_count = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class ApiKey(Base):
+    """API-Keys fuer programmatischen Zugriff"""
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    key_hash = Column(String, nullable=False)
+    key_prefix = Column(String(12), nullable=False)  # "mt_" + erste 8 Zeichen
+
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    last_used_at = Column(DateTime, nullable=True)
+
+    # Relationship
+    user = relationship("User", back_populates="api_keys")

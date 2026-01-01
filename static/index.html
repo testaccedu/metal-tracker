@@ -237,10 +237,63 @@
             </div>
         </div>
 
+        <!-- API Keys Section -->
+        <div class="bg-gray-800 rounded-lg p-4 mt-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-semibold">API-Keys</h2>
+                <button onclick="showCreateKeyModal()" class="bg-yellow-600 hover:bg-yellow-500 text-black text-sm font-bold px-3 py-1 rounded transition">
+                    + Neuer Key
+                </button>
+            </div>
+            <p class="text-gray-400 text-sm mb-4">Erstelle API-Keys fuer programmatischen Zugriff auf dein Portfolio.</p>
+            <div id="api-keys-list" class="space-y-2">
+                <p class="text-gray-500 text-sm">Lade API-Keys...</p>
+            </div>
+        </div>
+
         <!-- Footer -->
         <footer class="mt-6 text-center text-gray-600 text-xs">
-            <p>Preise von GOLD.DE - ohne Gewaehr | <a href="/docs" class="hover:text-gray-400">API Docs</a></p>
+            <p>Preise von GOLD.DE - ohne Gewaehr</p>
         </footer>
+    </div>
+
+    <!-- Modal: Neuen API-Key erstellen -->
+    <div id="create-key-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 class="text-lg font-semibold mb-4">Neuer API-Key</h3>
+            <input type="text" id="key-name-input" placeholder="Name (z.B. Mein Script)" maxlength="100"
+                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-3 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none mb-4">
+            <div class="flex gap-3">
+                <button onclick="hideCreateKeyModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 rounded transition">
+                    Abbrechen
+                </button>
+                <button onclick="createApiKey()" class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
+                    Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: API-Key anzeigen (nur einmal!) -->
+    <div id="show-key-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl">
+            <h3 class="text-lg font-semibold mb-2">API-Key erstellt</h3>
+            <p class="text-yellow-500 text-sm mb-4">Kopiere diesen Key jetzt - er wird nicht erneut angezeigt!</p>
+            <div class="bg-gray-900 rounded p-3 mb-4 flex items-center gap-2">
+                <code id="new-api-key" class="flex-1 text-sm break-all text-green-400"></code>
+                <button onclick="copyApiKey()" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition" title="Kopieren">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                </button>
+            </div>
+            <p class="text-gray-400 text-xs mb-4">
+                Verwendung: <code class="bg-gray-900 px-1 rounded">curl -H "X-API-Key: mt_..."</code>
+            </p>
+            <button onclick="hideShowKeyModal()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
+                Verstanden
+            </button>
+        </div>
     </div>
 
     <script>
@@ -565,12 +618,126 @@
             }
         }
 
+        // === API KEYS ===
+
+        function showCreateKeyModal() {
+            document.getElementById('key-name-input').value = '';
+            document.getElementById('create-key-modal').classList.remove('hidden');
+            document.getElementById('key-name-input').focus();
+        }
+
+        function hideCreateKeyModal() {
+            document.getElementById('create-key-modal').classList.add('hidden');
+        }
+
+        function hideShowKeyModal() {
+            document.getElementById('show-key-modal').classList.add('hidden');
+            loadApiKeys();
+        }
+
+        async function createApiKey() {
+            const name = document.getElementById('key-name-input').value.trim();
+            if (!name) {
+                alert('Bitte gib einen Namen ein');
+                return;
+            }
+
+            try {
+                const res = await apiFetch(API + '/api/auth/api-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+
+                if (!res) return;
+
+                if (res.ok) {
+                    const data = await res.json();
+                    hideCreateKeyModal();
+                    // Zeige Key im Modal
+                    document.getElementById('new-api-key').textContent = data.api_key;
+                    document.getElementById('show-key-modal').classList.remove('hidden');
+                } else {
+                    const err = await res.json();
+                    alert('Fehler: ' + (err.detail || 'Unbekannt'));
+                }
+            } catch (e) {
+                console.error('Fehler:', e);
+                alert('Fehler beim Erstellen des API-Keys');
+            }
+        }
+
+        async function copyApiKey() {
+            const key = document.getElementById('new-api-key').textContent;
+            try {
+                await navigator.clipboard.writeText(key);
+                alert('API-Key kopiert!');
+            } catch (e) {
+                // Fallback
+                const input = document.createElement('input');
+                input.value = key;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                alert('API-Key kopiert!');
+            }
+        }
+
+        async function loadApiKeys() {
+            try {
+                const res = await apiFetch(API + '/api/auth/api-keys');
+                if (!res || !res.ok) return;
+
+                const keys = await res.json();
+                const container = document.getElementById('api-keys-list');
+
+                if (keys.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-sm">Keine API-Keys vorhanden</p>';
+                    return;
+                }
+
+                container.innerHTML = keys.map(k => `
+                    <div class="flex items-center justify-between bg-gray-700/50 rounded p-3">
+                        <div>
+                            <span class="font-medium">${escapeHtml(k.name)}</span>
+                            <code class="ml-2 text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded">${escapeHtml(k.key_prefix)}...</code>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm text-gray-400">
+                            <span title="Erstellt">${formatDate(k.created_at)}</span>
+                            ${k.last_used_at ? '<span class="text-green-500" title="Zuletzt verwendet">Aktiv</span>' : ''}
+                            <button onclick="deleteApiKey(${k.id})" class="text-gray-500 hover:text-red-400 transition" title="Loeschen">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Fehler beim Laden der API-Keys:', e);
+            }
+        }
+
+        async function deleteApiKey(id) {
+            if (!confirm('API-Key wirklich loeschen?')) return;
+
+            try {
+                const res = await apiFetch(API + '/api/auth/api-keys/' + id, { method: 'DELETE' });
+                if (!res) return;
+                if (res.ok) loadApiKeys();
+            } catch (e) {
+                console.error('Fehler:', e);
+            }
+        }
+
         function loadAll() {
             loadUserInfo();
             loadPrices();
             loadSummary();
             loadPositions();
             loadHistory();
+            loadApiKeys();
         }
 
         // Event Listeners

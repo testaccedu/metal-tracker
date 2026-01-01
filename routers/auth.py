@@ -1,7 +1,8 @@
 """
-Auth Router - Endpoints fuer Registrierung, Login, OAuth
+Auth Router - Endpoints fuer Registrierung, Login, OAuth, API-Keys
 """
 import os
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -203,3 +204,88 @@ async def get_tier_info(user: models.User = Depends(auth_module.get_current_user
         "positions_remaining": remaining,
         "is_at_limit": remaining == 0
     }
+
+
+# === API KEYS ===
+
+@router.post("/api-keys", response_model=schemas.ApiKeyCreated, status_code=status.HTTP_201_CREATED)
+async def create_api_key(
+    key_data: schemas.ApiKeyCreate,
+    user: models.User = Depends(auth_module.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Erstellt einen neuen API-Key fuer den User.
+    WICHTIG: Der Key wird nur einmal angezeigt und kann nicht erneut abgerufen werden!
+    """
+    # Limit: Max 5 API-Keys pro User
+    existing_keys = db.query(models.ApiKey).filter(
+        models.ApiKey.user_id == user.id,
+        models.ApiKey.is_active == True
+    ).count()
+
+    if existing_keys >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximal 5 aktive API-Keys erlaubt"
+        )
+
+    # Generiere Key: mt_ + 32 random Zeichen
+    raw_key = "mt_" + secrets.token_urlsafe(32)
+    key_hash = auth_module.hash_api_key(raw_key)
+    key_prefix = raw_key[:11]  # "mt_" + erste 8 Zeichen
+
+    api_key = models.ApiKey(
+        user_id=user.id,
+        name=key_data.name,
+        key_hash=key_hash,
+        key_prefix=key_prefix
+    )
+    db.add(api_key)
+    db.commit()
+    db.refresh(api_key)
+
+    # Key nur einmal zurueckgeben!
+    return schemas.ApiKeyCreated(
+        id=api_key.id,
+        name=api_key.name,
+        api_key=raw_key,
+        created_at=api_key.created_at
+    )
+
+
+@router.get("/api-keys", response_model=list[schemas.ApiKeyResponse])
+async def list_api_keys(
+    user: models.User = Depends(auth_module.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Listet alle API-Keys des Users (ohne den eigentlichen Key)"""
+    keys = db.query(models.ApiKey).filter(
+        models.ApiKey.user_id == user.id
+    ).order_by(models.ApiKey.created_at.desc()).all()
+
+    return keys
+
+
+@router.delete("/api-keys/{key_id}")
+async def delete_api_key(
+    key_id: int,
+    user: models.User = Depends(auth_module.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Loescht einen API-Key"""
+    api_key = db.query(models.ApiKey).filter(
+        models.ApiKey.id == key_id,
+        models.ApiKey.user_id == user.id
+    ).first()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API-Key nicht gefunden"
+        )
+
+    db.delete(api_key)
+    db.commit()
+
+    return {"message": "API-Key geloescht", "id": key_id}

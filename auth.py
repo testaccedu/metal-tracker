@@ -5,10 +5,11 @@ Auth-Modul fuer Metal Tracker SaaS
 - Google OAuth Integration
 """
 import os
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -36,6 +37,36 @@ TIER_LIMITS = {
 
 # === PASSWORD HASHING ===
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# === API KEY HASHING ===
+
+def hash_api_key(key: str) -> str:
+    """Hasht einen API-Key mit SHA256"""
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def verify_api_key(db: Session, api_key: str) -> Optional[models.User]:
+    """Prueft einen API-Key und gibt den User zurueck"""
+    key_hash = hash_api_key(api_key)
+
+    api_key_obj = db.query(models.ApiKey).filter(
+        models.ApiKey.key_hash == key_hash,
+        models.ApiKey.is_active == True
+    ).first()
+
+    if not api_key_obj:
+        return None
+
+    # last_used_at aktualisieren
+    api_key_obj.last_used_at = datetime.utcnow()
+    db.commit()
+
+    user = api_key_obj.user
+    if not user.is_active:
+        return None
+
+    return user
 
 
 def hash_password(password: str) -> str:
@@ -121,11 +152,15 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[models
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     db: Session = Depends(get_db)
 ) -> models.User:
     """
-    FastAPI Dependency: Extrahiert und validiert den User aus dem JWT Token.
-    Wirft 401 wenn kein gueltiger Token vorhanden ist.
+    FastAPI Dependency: Authentifiziert User via:
+    1. API-Key (X-API-Key Header) - fuer programmatischen Zugriff
+    2. JWT Token (Authorization: Bearer) - fuer Web-UI
+
+    Wirft 401 wenn keine gueltige Auth vorhanden ist.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -133,40 +168,47 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"}
     )
 
-    if not token:
-        raise credentials_exception
+    # 1. Zuerst API-Key pruefen (wenn vorhanden)
+    if x_api_key and x_api_key.startswith("mt_"):
+        user = verify_api_key(db, x_api_key)
+        if user:
+            return user
 
-    token_data = decode_token(token)
-    if token_data is None:
-        raise credentials_exception
+    # 2. Dann JWT Token pruefen
+    if token:
+        token_data = decode_token(token)
+        if token_data is not None:
+            user = db.query(models.User).filter(models.User.id == token_data.user_id).first()
+            if user is not None and user.is_active:
+                return user
 
-    user = db.query(models.User).filter(models.User.id == token_data.user_id).first()
-    if user is None or not user.is_active:
-        raise credentials_exception
-
-    return user
+    raise credentials_exception
 
 
 async def get_current_user_optional(
     token: Optional[str] = Depends(oauth2_scheme),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     db: Session = Depends(get_db)
 ) -> Optional[models.User]:
     """
     Wie get_current_user, aber gibt None zurueck statt 401.
     Fuer Endpoints die optional Auth unterstuetzen.
     """
-    if not token:
-        return None
+    # 1. API-Key pruefen
+    if x_api_key and x_api_key.startswith("mt_"):
+        user = verify_api_key(db, x_api_key)
+        if user:
+            return user
 
-    token_data = decode_token(token)
-    if token_data is None:
-        return None
+    # 2. JWT Token pruefen
+    if token:
+        token_data = decode_token(token)
+        if token_data is not None:
+            user = db.query(models.User).filter(models.User.id == token_data.user_id).first()
+            if user is not None and user.is_active:
+                return user
 
-    user = db.query(models.User).filter(models.User.id == token_data.user_id).first()
-    if user is None or not user.is_active:
-        return None
-
-    return user
+    return None
 
 
 # === TIER LIMITS ===

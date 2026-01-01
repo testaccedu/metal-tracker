@@ -161,3 +161,29 @@ class TokenData(BaseModel):
     user_id: int
     email: str
     tier: str
+
+
+# === API KEY SCHEMAS ===
+
+class ApiKeyCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+
+class ApiKeyResponse(BaseModel):
+    id: int
+    name: str
+    key_prefix: str
+    is_active: bool
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ApiKeyCreated(BaseModel):
+    """Wird nur einmal bei Erstellung zurueckgegeben - Key danach nicht mehr abrufbar!"""
+    id: int
+    name: str
+    api_key: str
+    created_at: datetime
