@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metal Tracker - Edelmetall Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .gold-text { color: #FFD700; }
+        .silver-text { color: #C0C0C0; }
+        .platinum-text { color: #E5E4E2; }
+        .palladium-text { color: #CED0DD; }
+        .positive { color: #10B981; }
+        .negative { color: #EF4444; }
+        .gold-bg { background: linear-gradient(135deg, #FFD700 0%, #B8860B 100%); }
+        .silver-bg { background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%); }
+        select, input { color: #fff; }
+        select option { background: #1f2937; color: #fff; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-5xl">
+
+        <!-- Header -->
+        <header class="mb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold gold-text">Metal Tracker</h1>
+                <p class="text-gray-400 text-sm">Dein Edelmetall-Portfolio</p>
+            </div>
+            <div class="text-right text-sm text-gray-500">
+                <span id="last-update">-</span>
+            </div>
+        </header>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div class="bg-gray-800 rounded-lg p-4 border-l-4 border-gray-600">
+                <p class="text-gray-400 text-xs uppercase tracking-wide">Kaufwert</p>
+                <p id="total-purchase" class="text-xl font-bold mt-1">-</p>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 border-l-4 border-yellow-500">
+                <p class="text-gray-400 text-xs uppercase tracking-wide">Aktueller Wert</p>
+                <p id="total-current" class="text-xl font-bold mt-1">-</p>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 border-l-4 border-green-500">
+                <p class="text-gray-400 text-xs uppercase tracking-wide">Gewinn/Verlust</p>
+                <p id="total-profit" class="text-xl font-bold mt-1">-</p>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 border-l-4 border-blue-500">
+                <p class="text-gray-400 text-xs uppercase tracking-wide">Rendite</p>
+                <p id="total-percent" class="text-xl font-bold mt-1">-</p>
+            </div>
+        </div>
+
+        <!-- Chart & Preise -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+            <!-- Verlauf Chart -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-lg p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-semibold">Portfolio-Verlauf</h2>
+                    <select id="chart-period" class="bg-gray-700 rounded px-2 py-1 text-sm">
+                        <option value="7">7 Tage</option>
+                        <option value="30" selected>30 Tage</option>
+                        <option value="90">90 Tage</option>
+                        <option value="365">1 Jahr</option>
+                    </select>
+                </div>
+                <div class="h-48">
+                    <canvas id="history-chart"></canvas>
+                </div>
+                <p id="no-history" class="text-gray-500 text-sm text-center py-8 hidden">
+                    Noch keine Verlaufsdaten. Erstelle Positionen um den Verlauf zu sehen.
+                </p>
+            </div>
+
+            <!-- Aktuelle Preise -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="font-semibold mb-3">Ankaufspreise</h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="gold-text font-medium">Gold</span>
+                        <div class="text-right">
+                            <span id="price-gold-g" class="text-sm">-</span>
+                            <span class="text-gray-500 text-xs block" id="price-gold-oz">-</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="silver-text font-medium">Silber</span>
+                        <div class="text-right">
+                            <span id="price-silver-g" class="text-sm">-</span>
+                            <span class="text-gray-500 text-xs block" id="price-silver-oz">-</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="platinum-text font-medium">Platin</span>
+                        <div class="text-right">
+                            <span id="price-platinum-g" class="text-sm">-</span>
+                            <span class="text-gray-500 text-xs block" id="price-platinum-oz">-</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="palladium-text font-medium">Palladium</span>
+                        <div class="text-right">
+                            <span id="price-palladium-g" class="text-sm">-</span>
+                            <span class="text-gray-500 text-xs block" id="price-palladium-oz">-</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-700">
+                    Quelle: GOLD.DE (95% Spot)
+                </p>
+            </div>
+        </div>
+
+        <!-- Neue Position -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h2 class="font-semibold mb-4">Neue Position</h2>
+            <form id="add-form" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Metall</label>
+                    <select id="metal-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        <option value="gold">Gold</option>
+                        <option value="silver">Silber</option>
+                        <option value="platinum">Platin</option>
+                        <option value="palladium">Palladium</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Art</label>
+                    <select id="product-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        <option value="coin">Muenze</option>
+                        <option value="bar">Barren</option>
+                        <option value="round">Medaille</option>
+                        <option value="granulate">Granulat</option>
+                        <option value="jewelry">Schmuck</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Beschreibung</label>
+                    <input type="text" id="description" placeholder="z.B. Kruegerrand"
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Anzahl</label>
+                    <input type="number" id="quantity" value="1" min="1" step="1" required
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Gewicht/Stk</label>
+                    <div class="flex">
+                        <input type="number" id="weight" step="0.001" min="0" value="1" required
+                               class="w-full bg-gray-700 rounded-l px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        <select id="weight-unit" class="bg-gray-600 rounded-r px-2 py-2 text-sm focus:outline-none">
+                            <option value="oz">oz</option>
+                            <option value="g">g</option>
+                            <option value="kg">kg</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Kaufpreis ges.</label>
+                    <input type="number" id="purchase-price" step="0.01" min="0" required placeholder="EUR"
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Kaufdatum</label>
+                    <input type="date" id="purchase-date"
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit"
+                            class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 px-4 rounded text-sm transition">
+                        +
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Positionen Tabelle -->
+        <div class="bg-gray-800 rounded-lg p-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-semibold">Positionen</h2>
+                <span id="positions-count" class="text-gray-400 text-sm">0 Positionen</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
+                            <th class="text-left py-2 px-1">Metall</th>
+                            <th class="text-left py-2 px-1">Art</th>
+                            <th class="text-left py-2 px-1">Beschreibung</th>
+                            <th class="text-right py-2 px-1">Anz.</th>
+                            <th class="text-right py-2 px-1">Gewicht</th>
+                            <th class="text-right py-2 px-1">Kaufpreis</th>
+                            <th class="text-right py-2 px-1">Aktuell</th>
+                            <th class="text-right py-2 px-1">+/-</th>
+                            <th class="text-center py-2 px-1"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-table">
+                        <tr><td colspan="8" class="text-center py-8 text-gray-500">Lade Positionen...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-6 text-center text-gray-600 text-xs">
+            <p>Preise von GOLD.DE - ohne Gewaehr | <a href="/docs" class="hover:text-gray-400">API Docs</a></p>
+        </footer>
+    </div>
+
+    <script>
+        const API = '';
+        let historyChart = null;
+
+        // Formatierung
+        const formatEUR = (val) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val);
+        const formatPercent = (val) => (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+        const formatWeight = (val, unit) => {
+            if (unit === 'oz') return val.toFixed(3) + ' oz';
+            if (unit === 'kg') return val.toFixed(3) + ' kg';
+            return val.toFixed(2) + ' g';
+        };
+        const formatDate = (d) => new Date(d).toLocaleDateString('de-DE');
+
+        const metalNames = { gold: 'Gold', silver: 'Silber', platinum: 'Platin', palladium: 'Palladium' };
+        const metalColors = { gold: 'gold-text', silver: 'silver-text', platinum: 'platinum-text', palladium: 'palladium-text' };
+        const productNames = { coin: 'Muenze', bar: 'Barren', round: 'Medaille', granulate: 'Granulat', jewelry: 'Schmuck' };
+
+        // Daten laden
+        async function loadPrices() {
+            try {
+                const res = await fetch(API + '/api/prices');
+                const data = await res.json();
+
+                for (const [metal, info] of Object.entries(data.prices)) {
+                    const gEl = document.getElementById('price-' + metal + '-g');
+                    const ozEl = document.getElementById('price-' + metal + '-oz');
+                    if (gEl) gEl.textContent = formatEUR(info.ankauf_per_gram_eur) + '/g';
+                    if (ozEl) ozEl.textContent = formatEUR(info.ankauf_per_oz_eur) + '/oz';
+                }
+
+                document.getElementById('last-update').textContent =
+                    'Update: ' + new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+            } catch (e) {
+                console.error('Fehler beim Laden der Preise:', e);
+            }
+        }
+
+        async function loadSummary() {
+            try {
+                const res = await fetch(API + '/api/summary');
+                const data = await res.json();
+
+                document.getElementById('total-purchase').textContent = formatEUR(data.total_purchase_value_eur);
+                document.getElementById('total-current').textContent = formatEUR(data.total_current_value_eur);
+
+                const profitEl = document.getElementById('total-profit');
+                profitEl.textContent = (data.total_profit_loss_eur >= 0 ? '+' : '') + formatEUR(data.total_profit_loss_eur);
+                profitEl.className = 'text-xl font-bold mt-1 ' + (data.total_profit_loss_eur >= 0 ? 'positive' : 'negative');
+
+                const percentEl = document.getElementById('total-percent');
+                percentEl.textContent = formatPercent(data.total_profit_loss_percent);
+                percentEl.className = 'text-xl font-bold mt-1 ' + (data.total_profit_loss_percent >= 0 ? 'positive' : 'negative');
+            } catch (e) {
+                console.error('Fehler beim Laden der Summary:', e);
+            }
+        }
+
+        async function loadPositions() {
+            try {
+                const res = await fetch(API + '/api/positions');
+                const positions = await res.json();
+
+                const tbody = document.getElementById('positions-table');
+                document.getElementById('positions-count').textContent = positions.length + ' Position' + (positions.length !== 1 ? 'en' : '');
+
+                if (positions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">Keine Positionen vorhanden</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = positions.map(p => `
+                    <tr class="border-b border-gray-700/50 hover:bg-gray-700/30">
+                        <td class="py-3 px-1 ${metalColors[p.metal_type] || ''} font-medium">${metalNames[p.metal_type] || p.metal_type}</td>
+                        <td class="py-3 px-1 text-gray-400">${productNames[p.product_type] || p.product_type}</td>
+                        <td class="py-3 px-1">${p.description || '-'}</td>
+                        <td class="py-3 px-1 text-right">${p.quantity}x</td>
+                        <td class="py-3 px-1 text-right font-mono text-xs">${p.quantity > 1 ? p.quantity + 'x ' : ''}${formatWeight(p.weight_per_unit, p.weight_unit)}</td>
+                        <td class="py-3 px-1 text-right">${formatEUR(p.purchase_price_eur)}</td>
+                        <td class="py-3 px-1 text-right font-medium">${formatEUR(p.current_value_eur)}</td>
+                        <td class="py-3 px-1 text-right ${p.profit_loss_eur >= 0 ? 'positive' : 'negative'}">
+                            ${(p.profit_loss_eur >= 0 ? '+' : '') + formatEUR(p.profit_loss_eur)}<br>
+                            <span class="text-xs opacity-75">${formatPercent(p.profit_loss_percent)}</span>
+                        </td>
+                        <td class="py-3 px-1 text-center">
+                            <button onclick="deletePosition(${p.id})" class="text-gray-500 hover:text-red-400 transition" title="Loeschen">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('Fehler beim Laden der Positionen:', e);
+            }
+        }
+
+        async function loadHistory() {
+            const days = document.getElementById('chart-period').value;
+            try {
+                const res = await fetch(API + '/api/history?days=' + days);
+                const data = await res.json();
+
+                const chartEl = document.getElementById('history-chart');
+                const noHistoryEl = document.getElementById('no-history');
+
+                if (data.snapshots.length === 0) {
+                    chartEl.style.display = 'none';
+                    noHistoryEl.classList.remove('hidden');
+                    return;
+                }
+
+                chartEl.style.display = 'block';
+                noHistoryEl.classList.add('hidden');
+
+                const labels = data.snapshots.map(s => formatDate(s.date));
+                const values = data.snapshots.map(s => s.total_current_value_eur);
+                const purchases = data.snapshots.map(s => s.total_purchase_value_eur);
+
+                if (historyChart) historyChart.destroy();
+
+                historyChart = new Chart(chartEl, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Aktueller Wert',
+                                data: values,
+                                borderColor: '#FFD700',
+                                backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            },
+                            {
+                                label: 'Kaufwert',
+                                data: purchases,
+                                borderColor: '#6B7280',
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top', labels: { color: '#9CA3AF', boxWidth: 12 } }
+                        },
+                        scales: {
+                            x: { grid: { color: '#374151' }, ticks: { color: '#9CA3AF', maxRotation: 0 } },
+                            y: { grid: { color: '#374151' }, ticks: { color: '#9CA3AF', callback: v => formatEUR(v) } }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('Fehler beim Laden der History:', e);
+            }
+        }
+
+        async function addPosition(e) {
+            e.preventDefault();
+
+            const data = {
+                metal_type: document.getElementById('metal-type').value,
+                product_type: document.getElementById('product-type').value,
+                description: document.getElementById('description').value || null,
+                quantity: parseInt(document.getElementById('quantity').value) || 1,
+                weight_per_unit: parseFloat(document.getElementById('weight').value),
+                weight_unit: document.getElementById('weight-unit').value,
+                purchase_price_eur: parseFloat(document.getElementById('purchase-price').value),
+                purchase_date: document.getElementById('purchase-date').value || null
+            };
+
+            try {
+                const res = await fetch(API + '/api/positions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    document.getElementById('add-form').reset();
+                    document.getElementById('weight-unit').value = 'oz';
+                    document.getElementById('quantity').value = '1';
+                    document.getElementById('weight').value = '1';
+                    loadAll();
+                } else {
+                    const err = await res.json();
+                    alert('Fehler: ' + (err.detail || 'Unbekannt'));
+                }
+            } catch (e) {
+                console.error('Fehler:', e);
+                alert('Fehler beim Hinzufuegen');
+            }
+        }
+
+        async function deletePosition(id) {
+            if (!confirm('Position wirklich loeschen?')) return;
+
+            try {
+                const res = await fetch(API + '/api/positions/' + id, { method: 'DELETE' });
+                if (res.ok) loadAll();
+            } catch (e) {
+                console.error('Fehler:', e);
+            }
+        }
+
+        function loadAll() {
+            loadPrices();
+            loadSummary();
+            loadPositions();
+            loadHistory();
+        }
+
+        // Event Listeners
+        document.getElementById('add-form').addEventListener('submit', addPosition);
+        document.getElementById('chart-period').addEventListener('change', loadHistory);
+
+        // Init
+        loadAll();
+
+        // Auto-refresh alle 5 Minuten
+        setInterval(loadAll, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
