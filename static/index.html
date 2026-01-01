@@ -746,19 +746,20 @@
 
         // Init - Check Auth first
         (function init() {
-            const token = getToken();
-            if (!token) {
-                window.location.href = '/login.html';
-                return;
-            }
-
-            // Check for OAuth token in URL (callback from Google)
+            // WICHTIG: Zuerst OAuth-Token aus URL pruefen (Google Callback)
             const urlParams = new URLSearchParams(window.location.search);
             const oauthToken = urlParams.get('token');
             if (oauthToken) {
                 localStorage.setItem('metaltracker_token', oauthToken);
-                // Clean URL
+                // Clean URL und neu laden
                 window.history.replaceState({}, document.title, '/');
+            }
+
+            // Dann localStorage pruefen
+            const token = getToken();
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
             }
 
             loadAll();
