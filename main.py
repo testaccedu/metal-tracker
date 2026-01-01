@@ -184,10 +184,6 @@ async def create_position(
     db.commit()
     db.refresh(db_position)
 
-    # Historische Snapshots erstellen wenn Kaufdatum vorhanden
-    if db_position.purchase_date:
-        await backfill_snapshots(db, db_position, user)
-
     # Snapshot aktualisieren
     await update_daily_snapshot(db, user)
 
@@ -510,76 +506,6 @@ async def update_daily_snapshot(db: Session, user: models.User):
             positions_count=len(positions)
         )
         db.add(snapshot)
-
-    db.commit()
-
-
-async def backfill_snapshots(db: Session, position: models.Position, user: models.User):
-    """Erstellt rueckwirkend Snapshots ab dem Kaufdatum einer Position"""
-    import random
-
-    if not position.purchase_date:
-        return
-
-    today = date.today()
-    start_date = position.purchase_date
-
-    # Nicht mehr als 365 Tage zurueck
-    max_days_back = 365
-    if (today - start_date).days > max_days_back:
-        start_date = today - timedelta(days=max_days_back)
-
-    # Aktuelle Preise holen
-    current_prices = await price_service.fetch_live_prices()
-
-    # Alle Positionen des Users fuer Gesamtberechnung
-    all_positions = db.query(models.Position).filter(models.Position.user_id == user.id).all()
-
-    # Fuer jeden Tag seit Kaufdatum
-    current_date = start_date
-    while current_date < today:
-        # Pruefen ob Snapshot schon existiert fuer diesen User
-        existing = db.query(models.PortfolioSnapshot).filter(
-            models.PortfolioSnapshot.user_id == user.id,
-            models.PortfolioSnapshot.date == current_date
-        ).first()
-
-        if not existing:
-            # Simuliere Preisschwankung: +/- 10% ueber die Zeit
-            days_ago = (today - current_date).days
-            # Je weiter zurueck, desto mehr Schwankung moeglich
-            variance = random.uniform(-0.10, 0.05) * (days_ago / 365)
-
-            total_purchase = 0.0
-            total_current = 0.0
-            weights = {"gold": 0, "silver": 0, "platinum": 0, "palladium": 0}
-
-            for p in all_positions:
-                # Nur Positionen die an diesem Datum schon existierten
-                if p.purchase_date and p.purchase_date <= current_date:
-                    total_purchase += p.purchase_price_eur
-                    # Simulierter Preis mit Schwankung
-                    price_per_gram = current_prices.get(p.metal_type, 0) * (1 + variance)
-                    current_value = price_per_gram * p.weight_grams
-                    total_current += current_value
-                    if p.metal_type in weights:
-                        weights[p.metal_type] += p.weight_grams
-
-            if total_purchase > 0:  # Nur wenn es Positionen gab
-                snapshot = models.PortfolioSnapshot(
-                    user_id=user.id,
-                    date=current_date,
-                    total_purchase_value_eur=total_purchase,
-                    total_current_value_eur=total_current,
-                    total_weight_gold_g=weights["gold"],
-                    total_weight_silver_g=weights["silver"],
-                    total_weight_platinum_g=weights["platinum"],
-                    total_weight_palladium_g=weights["palladium"],
-                    positions_count=sum(1 for p in all_positions if p.purchase_date and p.purchase_date <= current_date)
-                )
-                db.add(snapshot)
-
-        current_date += timedelta(days=1)
 
     db.commit()
 

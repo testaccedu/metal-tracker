@@ -60,7 +60,7 @@
                 <p class="text-yellow-500 font-medium">Position-Limit fast erreicht!</p>
                 <p class="text-sm text-gray-400">Upgrade auf Premium fuer unbegrenzte Positionen.</p>
             </div>
-            <button class="bg-yellow-600 hover:bg-yellow-500 text-black font-bold px-4 py-2 rounded text-sm transition">
+            <button class="hidden bg-yellow-600 hover:bg-yellow-500 text-black font-bold px-4 py-2 rounded text-sm transition">
                 Upgrade
             </button>
         </div>
@@ -231,7 +231,7 @@
                         </tr>
                     </thead>
                     <tbody id="positions-table">
-                        <tr><td colspan="8" class="text-center py-8 text-gray-500">Lade Positionen...</td></tr>
+                        <tr><td colspan="9" class="text-center py-8 text-gray-500">Lade Positionen...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -414,7 +414,7 @@
                 document.getElementById('positions-count').textContent = positions.length + ' Position' + (positions.length !== 1 ? 'en' : '');
 
                 if (positions.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">Keine Positionen vorhanden</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">Keine Positionen vorhanden</td></tr>';
                     return;
                 }
 

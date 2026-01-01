@@ -140,6 +140,6 @@ heroku pg:backups:restore <backup-id> --app metal-tracker-tn
 - Besser: Alembic Migrations fuer Schema-Aenderungen
 
 ## Bekannte Einschraenkungen
-- Historische Preise sind simuliert (backfill_snapshots)
+- Historische Daten werden ab Positionserstellung gesammelt (keine Backfill-Funktion)
 - CDN-Abhaengigkeit fuer Tailwind/Chart.js
 - passlib 1.7.4 zeigt Warnung mit bcrypt 4.2.0 (funktioniert aber)
