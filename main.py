@@ -17,8 +17,11 @@ import price_service
 # Pfad zum static Verzeichnis
 STATIC_DIR = Path(__file__).parent / "static"
 
-# Datenbank-Tabellen erstellen
-Base.metadata.create_all(bind=engine)
+# Datenbank-Tabellen erstellen (checkfirst verhindert Fehler bei existierenden Tabellen)
+try:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+except Exception as e:
+    print(f"Tabellen-Erstellung: {e}")
 
 app = FastAPI(
     title="Metal Tracker API",
