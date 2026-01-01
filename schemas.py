@@ -48,11 +48,11 @@ def convert_from_grams(grams: float, unit: str) -> float:
 class PositionBase(BaseModel):
     metal_type: MetalType
     product_type: ProductType = ProductType.BAR
-    description: Optional[str] = None
-    quantity: int = Field(1, ge=1, description="Anzahl/Stueckzahl")
-    weight_per_unit: float = Field(..., gt=0, description="Gewicht pro Stueck")
+    description: Optional[str] = Field(None, max_length=200, description="Beschreibung (max 200 Zeichen)")
+    quantity: int = Field(1, ge=1, le=10000, description="Anzahl/Stueckzahl (1-10000)")
+    weight_per_unit: float = Field(..., gt=0, le=100000, description="Gewicht pro Stueck (max 100kg)")
     weight_unit: WeightUnit = WeightUnit.OUNCE
-    purchase_price_eur: float = Field(..., gt=0, description="Gesamtkaufpreis in EUR")
+    purchase_price_eur: float = Field(..., gt=0, le=100000000, description="Gesamtkaufpreis in EUR (max 100M)")
     purchase_date: Optional[date] = None
 
 
@@ -63,11 +63,11 @@ class PositionCreate(PositionBase):
 class PositionUpdate(BaseModel):
     metal_type: Optional[MetalType] = None
     product_type: Optional[ProductType] = None
-    description: Optional[str] = None
-    quantity: Optional[int] = Field(None, ge=1)
-    weight_per_unit: Optional[float] = Field(None, gt=0)
+    description: Optional[str] = Field(None, max_length=200)
+    quantity: Optional[int] = Field(None, ge=1, le=10000)
+    weight_per_unit: Optional[float] = Field(None, gt=0, le=100000)
     weight_unit: Optional[WeightUnit] = None
-    purchase_price_eur: Optional[float] = Field(None, gt=0)
+    purchase_price_eur: Optional[float] = Field(None, gt=0, le=100000000)
     purchase_date: Optional[date] = None
 
 

@@ -215,6 +215,27 @@
         const API = '';
         let historyChart = null;
 
+        // === API-KEY KONFIGURATION ===
+        // Setze deinen API-Key hier oder im localStorage
+        let API_KEY = localStorage.getItem('metaltracker_api_key') || '';
+
+        // Hilfsfunktion fuer API-Requests mit Auth
+        async function apiFetch(url, options = {}) {
+            const headers = options.headers || {};
+            if (API_KEY) {
+                headers['X-API-Key'] = API_KEY;
+            }
+            return fetch(url, { ...options, headers });
+        }
+
+        // === XSS-SCHUTZ ===
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         // Formatierung
         const formatEUR = (val) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val);
         const formatPercent = (val) => (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
@@ -251,7 +272,8 @@
 
         async function loadSummary() {
             try {
-                const res = await fetch(API + '/api/summary');
+                const res = await apiFetch(API + '/api/summary');
+                if (res.status === 401) { promptApiKey(); return; }
                 const data = await res.json();
 
                 document.getElementById('total-purchase').textContent = formatEUR(data.total_purchase_value_eur);
@@ -271,7 +293,8 @@
 
         async function loadPositions() {
             try {
-                const res = await fetch(API + '/api/positions');
+                const res = await apiFetch(API + '/api/positions');
+                if (res.status === 401) { promptApiKey(); return; }
                 const positions = await res.json();
 
                 const tbody = document.getElementById('positions-table');
@@ -284,11 +307,11 @@
 
                 tbody.innerHTML = positions.map(p => `
                     <tr class="border-b border-gray-700/50 hover:bg-gray-700/30">
-                        <td class="py-3 px-1 ${metalColors[p.metal_type] || ''} font-medium">${metalNames[p.metal_type] || p.metal_type}</td>
-                        <td class="py-3 px-1 text-gray-400">${productNames[p.product_type] || p.product_type}</td>
-                        <td class="py-3 px-1">${p.description || '-'}</td>
-                        <td class="py-3 px-1 text-right">${p.quantity}x</td>
-                        <td class="py-3 px-1 text-right font-mono text-xs">${p.quantity > 1 ? p.quantity + 'x ' : ''}${formatWeight(p.weight_per_unit, p.weight_unit)}</td>
+                        <td class="py-3 px-1 ${metalColors[p.metal_type] || ''} font-medium">${escapeHtml(metalNames[p.metal_type] || p.metal_type)}</td>
+                        <td class="py-3 px-1 text-gray-400">${escapeHtml(productNames[p.product_type] || p.product_type)}</td>
+                        <td class="py-3 px-1">${escapeHtml(p.description) || '-'}</td>
+                        <td class="py-3 px-1 text-right">${parseInt(p.quantity)}x</td>
+                        <td class="py-3 px-1 text-right font-mono text-xs">${p.quantity > 1 ? parseInt(p.quantity) + 'x ' : ''}${formatWeight(p.weight_per_unit, p.weight_unit)}</td>
                         <td class="py-3 px-1 text-right">${formatEUR(p.purchase_price_eur)}</td>
                         <td class="py-3 px-1 text-right font-medium">${formatEUR(p.current_value_eur)}</td>
                         <td class="py-3 px-1 text-right ${p.profit_loss_eur >= 0 ? 'positive' : 'negative'}">
@@ -296,7 +319,7 @@
                             <span class="text-xs opacity-75">${formatPercent(p.profit_loss_percent)}</span>
                         </td>
                         <td class="py-3 px-1 text-center">
-                            <button onclick="deletePosition(${p.id})" class="text-gray-500 hover:text-red-400 transition" title="Loeschen">
+                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition" title="Loeschen">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
@@ -312,7 +335,8 @@
         async function loadHistory() {
             const days = document.getElementById('chart-period').value;
             try {
-                const res = await fetch(API + '/api/history?days=' + days);
+                const res = await apiFetch(API + '/api/history?days=' + days);
+                if (res.status === 401) { promptApiKey(); return; }
                 const data = await res.json();
 
                 const chartEl = document.getElementById('history-chart');
@@ -388,12 +412,13 @@
             };
 
             try {
-                const res = await fetch(API + '/api/positions', {
+                const res = await apiFetch(API + '/api/positions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
 
+                if (res.status === 401) { promptApiKey(); return; }
                 if (res.ok) {
                     document.getElementById('add-form').reset();
                     document.getElementById('weight-unit').value = 'oz';
@@ -414,11 +439,28 @@
             if (!confirm('Position wirklich loeschen?')) return;
 
             try {
-                const res = await fetch(API + '/api/positions/' + id, { method: 'DELETE' });
+                const res = await apiFetch(API + '/api/positions/' + id, { method: 'DELETE' });
+                if (res.status === 401) { promptApiKey(); return; }
                 if (res.ok) loadAll();
             } catch (e) {
                 console.error('Fehler:', e);
             }
+        }
+
+        // === API-KEY EINGABE ===
+        function promptApiKey() {
+            const key = prompt('API-Key erforderlich.\n\nBitte gib deinen API-Key ein:');
+            if (key) {
+                API_KEY = key;
+                localStorage.setItem('metaltracker_api_key', key);
+                loadAll();
+            }
+        }
+
+        function clearApiKey() {
+            API_KEY = '';
+            localStorage.removeItem('metaltracker_api_key');
+            alert('API-Key wurde entfernt.');
         }
 
         function loadAll() {

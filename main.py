@@ -1,12 +1,17 @@
 import os
+import secrets
 from pathlib import Path
 from datetime import datetime, date, timedelta
 from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 import models
 import schemas
@@ -14,58 +19,108 @@ from schemas import convert_to_grams
 from database import engine, get_db, Base
 import price_service
 
+# === KONFIGURATION ===
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+API_KEY = os.getenv("API_KEY", "")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://metal-tracker-tn-ffb450a69489.herokuapp.com").split(",")
+
 # Pfad zum static Verzeichnis
 STATIC_DIR = Path(__file__).parent / "static"
 
-# Datenbank-Tabellen erstellen (checkfirst verhindert Fehler bei existierenden Tabellen)
+# Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+
+# Datenbank-Tabellen erstellen
 try:
     Base.metadata.create_all(bind=engine, checkfirst=True)
-except Exception as e:
-    print(f"Tabellen-Erstellung: {e}")
+except Exception:
+    pass  # Fehler nicht loggen (keine DB-Details exponieren)
 
+# === API-KEY AUTHENTIFIZIERUNG ===
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(api_key: str = Security(api_key_header)):
+    """Prueft den API-Key. Gibt 401 zurueck wenn ungueltig."""
+    if not API_KEY:
+        # Kein API_KEY konfiguriert = Auth deaktiviert (nur fuer Entwicklung!)
+        return None
+    if not api_key or not secrets.compare_digest(api_key, API_KEY):
+        raise HTTPException(
+            status_code=401,
+            detail="Ungültiger oder fehlender API-Key",
+            headers={"WWW-Authenticate": "ApiKey"}
+        )
+    return api_key
+
+
+# === FASTAPI APP ===
 app = FastAPI(
     title="Metal Tracker API",
     description="API zum Verwalten deines Edelmetall-Portfolios (Gold, Silber, Platin, Palladium)",
-    version="2.0.0"
+    version="2.1.0",
+    docs_url="/docs" if DEBUG else None,  # Docs nur im Debug-Modus
+    redoc_url="/redoc" if DEBUG else None
 )
 
-# CORS erlauben
+# Rate Limit Handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS - eingeschraenkt
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS if not DEBUG else ["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
+
+
+# === SECURITY HEADERS MIDDLEWARE ===
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if not DEBUG:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 
 @app.get("/", tags=["Root"], include_in_schema=False)
-async def root():
+@limiter.limit("60/minute")
+async def root(request: Request):
     """Serve die Web-UI"""
     return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/api", tags=["Root"])
-async def api_info():
+@limiter.limit("60/minute")
+async def api_info(request: Request):
     """API Status und Info"""
     return {
         "name": "Metal Tracker API",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "status": "running",
-        "docs": "/docs"
+        "auth_required": bool(API_KEY),
+        "docs": "/docs" if DEBUG else None
     }
 
 
 @app.get("/health", tags=["Root"])
 async def health_check():
-    """Health Check Endpunkt"""
+    """Health Check Endpunkt (kein Rate Limit)"""
     return {"status": "healthy"}
 
 
-# === PREISE ===
+# === PREISE (oeffentlich, mit Rate Limit) ===
 
 @app.get("/api/prices", response_model=dict, tags=["Preise"])
-async def get_current_prices():
+@limiter.limit("30/minute")
+async def get_current_prices(request: Request):
     """Aktuelle Edelmetall-Preise abrufen (Quelle: GOLD.DE)"""
     prices = await price_service.get_all_prices()
     source_info = price_service.get_source_info()
@@ -77,7 +132,8 @@ async def get_current_prices():
 
 
 @app.get("/api/prices/{metal_type}", tags=["Preise"])
-async def get_metal_price(metal_type: schemas.MetalType):
+@limiter.limit("30/minute")
+async def get_metal_price(request: Request, metal_type: schemas.MetalType):
     """Preis fuer ein bestimmtes Metall abrufen"""
     prices = await price_service.get_all_prices()
     metal = metal_type.value.lower()
@@ -88,10 +144,16 @@ async def get_metal_price(metal_type: schemas.MetalType):
     return prices[metal]
 
 
-# === POSITIONEN ===
+# === POSITIONEN (geschuetzt) ===
 
 @app.post("/api/positions", response_model=schemas.Position, tags=["Positionen"])
-async def create_position(position: schemas.PositionCreate, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+async def create_position(
+    request: Request,
+    position: schemas.PositionCreate,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
+):
     """Neue Position hinzufuegen"""
     # Gesamtgewicht in Gramm berechnen: Anzahl * Gewicht pro Stueck
     weight_per_unit_grams = convert_to_grams(position.weight_per_unit, position.weight_unit.value)
@@ -123,10 +185,13 @@ async def create_position(position: schemas.PositionCreate, db: Session = Depend
 
 
 @app.get("/api/positions", response_model=list[schemas.Position], tags=["Positionen"])
+@limiter.limit("30/minute")
 async def get_positions(
+    request: Request,
     metal_type: Optional[schemas.MetalType] = Query(None, description="Nach Metallart filtern"),
     product_type: Optional[schemas.ProductType] = Query(None, description="Nach Produktart filtern"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
 ):
     """Alle Positionen abrufen"""
     query = db.query(models.Position)
@@ -141,7 +206,13 @@ async def get_positions(
 
 
 @app.get("/api/positions/{position_id}", response_model=schemas.Position, tags=["Positionen"])
-async def get_position(position_id: int, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def get_position(
+    request: Request,
+    position_id: int,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
+):
     """Einzelne Position abrufen"""
     position = db.query(models.Position).filter(models.Position.id == position_id).first()
 
@@ -152,10 +223,13 @@ async def get_position(position_id: int, db: Session = Depends(get_db)):
 
 
 @app.put("/api/positions/{position_id}", response_model=schemas.Position, tags=["Positionen"])
+@limiter.limit("20/minute")
 async def update_position(
+    request: Request,
     position_id: int,
     position_update: schemas.PositionUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
 ):
     """Position aktualisieren"""
     position = db.query(models.Position).filter(models.Position.id == position_id).first()
@@ -195,7 +269,13 @@ async def update_position(
 
 
 @app.delete("/api/positions/{position_id}", tags=["Positionen"])
-async def delete_position(position_id: int, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+async def delete_position(
+    request: Request,
+    position_id: int,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
+):
     """Position loeschen"""
     position = db.query(models.Position).filter(models.Position.id == position_id).first()
 
@@ -214,7 +294,12 @@ async def delete_position(position_id: int, db: Session = Depends(get_db)):
 # === PORTFOLIO SUMMARY ===
 
 @app.get("/api/summary", response_model=schemas.PortfolioSummary, tags=["Portfolio"])
-async def get_portfolio_summary(db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def get_portfolio_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
+):
     """Portfolio-Zusammenfassung mit Gesamtwert abrufen"""
     positions = db.query(models.Position).all()
 
@@ -285,9 +370,12 @@ async def get_portfolio_summary(db: Session = Depends(get_db)):
 # === PORTFOLIO HISTORY ===
 
 @app.get("/api/history", response_model=schemas.PortfolioHistory, tags=["Portfolio"])
+@limiter.limit("30/minute")
 async def get_portfolio_history(
+    request: Request,
     days: int = Query(30, ge=7, le=365, description="Anzahl Tage"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
 ):
     """Portfolio-Verlauf abrufen"""
     start_date = date.today() - timedelta(days=days)
@@ -313,7 +401,12 @@ async def get_portfolio_history(
 
 
 @app.post("/api/history/snapshot", tags=["Portfolio"])
-async def create_snapshot(db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def create_snapshot(
+    request: Request,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
+):
     """Manuell einen Snapshot erstellen"""
     await update_daily_snapshot(db)
     return {"message": "Snapshot erstellt", "date": date.today().isoformat()}
