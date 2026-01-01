@@ -28,10 +28,42 @@
                 <h1 class="text-2xl font-bold gold-text">Metal Tracker</h1>
                 <p class="text-gray-400 text-sm">Dein Edelmetall-Portfolio</p>
             </div>
-            <div class="text-right text-sm text-gray-500">
-                <span id="last-update">-</span>
+            <div class="flex items-center gap-4">
+                <div class="text-right text-sm text-gray-500">
+                    <span id="last-update">-</span>
+                </div>
+                <!-- User Menu -->
+                <div class="relative" id="user-menu">
+                    <button onclick="toggleUserMenu()" class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition">
+                        <span id="user-email" class="text-sm text-gray-300 max-w-[120px] truncate">-</span>
+                        <span id="tier-badge" class="text-xs px-2 py-0.5 rounded bg-gray-600 text-gray-300">free</span>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-50">
+                        <div class="px-4 py-3 border-b border-gray-700">
+                            <p class="text-xs text-gray-500">Positionen</p>
+                            <p class="text-sm"><span id="positions-used">0</span> / <span id="positions-limit">10</span></p>
+                        </div>
+                        <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-gray-700 rounded-b-lg transition">
+                            Abmelden
+                        </button>
+                    </div>
+                </div>
             </div>
         </header>
+
+        <!-- Upgrade Banner (nur fuer Free-User) -->
+        <div id="upgrade-banner" class="hidden mb-4 bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 border border-yellow-600/30 rounded-lg p-4 flex justify-between items-center">
+            <div>
+                <p class="text-yellow-500 font-medium">Position-Limit fast erreicht!</p>
+                <p class="text-sm text-gray-400">Upgrade auf Premium fuer unbegrenzte Positionen.</p>
+            </div>
+            <button class="bg-yellow-600 hover:bg-yellow-500 text-black font-bold px-4 py-2 rounded text-sm transition">
+                Upgrade
+            </button>
+        </div>
 
         <!-- Summary Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
@@ -214,18 +246,99 @@
     <script>
         const API = '';
         let historyChart = null;
+        let currentUser = null;
 
-        // === API-KEY KONFIGURATION ===
-        // Setze deinen API-Key hier oder im localStorage
-        let API_KEY = localStorage.getItem('metaltracker_api_key') || '';
+        // === JWT TOKEN MANAGEMENT ===
+        function getToken() {
+            return localStorage.getItem('metaltracker_token');
+        }
 
-        // Hilfsfunktion fuer API-Requests mit Auth
+        function removeToken() {
+            localStorage.removeItem('metaltracker_token');
+        }
+
+        // Hilfsfunktion fuer API-Requests mit JWT Auth
         async function apiFetch(url, options = {}) {
-            const headers = options.headers || {};
-            if (API_KEY) {
-                headers['X-API-Key'] = API_KEY;
+            const token = getToken();
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
             }
-            return fetch(url, { ...options, headers });
+
+            const headers = options.headers || {};
+            headers['Authorization'] = 'Bearer ' + token;
+
+            const response = await fetch(url, { ...options, headers });
+
+            // Bei 401 -> Token ungueltig -> Logout
+            if (response.status === 401) {
+                removeToken();
+                window.location.href = '/login.html';
+                return;
+            }
+
+            return response;
+        }
+
+        // === USER MENU ===
+        function toggleUserMenu() {
+            document.getElementById('user-dropdown').classList.toggle('hidden');
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('user-menu');
+            if (menu && !menu.contains(e.target)) {
+                document.getElementById('user-dropdown').classList.add('hidden');
+            }
+        });
+
+        function logout() {
+            removeToken();
+            window.location.href = '/login.html';
+        }
+
+        // === LOAD USER INFO ===
+        async function loadUserInfo() {
+            try {
+                const res = await apiFetch(API + '/api/auth/me');
+                if (!res || !res.ok) return;
+
+                currentUser = await res.json();
+
+                // Update UI
+                document.getElementById('user-email').textContent = currentUser.email;
+                document.getElementById('tier-badge').textContent = currentUser.tier;
+
+                if (currentUser.tier === 'premium') {
+                    document.getElementById('tier-badge').classList.remove('bg-gray-600');
+                    document.getElementById('tier-badge').classList.add('bg-yellow-600', 'text-black');
+                }
+
+                // Load tier info
+                await loadTierInfo();
+            } catch (e) {
+                console.error('Fehler beim Laden der User-Info:', e);
+            }
+        }
+
+        async function loadTierInfo() {
+            try {
+                const res = await apiFetch(API + '/api/auth/tier-info');
+                if (!res || !res.ok) return;
+
+                const tierInfo = await res.json();
+
+                document.getElementById('positions-used').textContent = tierInfo.positions_count;
+                document.getElementById('positions-limit').textContent = tierInfo.positions_limit;
+
+                // Show upgrade banner if near limit (80%+) and not premium
+                if (tierInfo.tier === 'free' && tierInfo.positions_count >= 8) {
+                    document.getElementById('upgrade-banner').classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error('Fehler beim Laden der Tier-Info:', e);
+            }
         }
 
         // === XSS-SCHUTZ ===
@@ -273,7 +386,7 @@
         async function loadSummary() {
             try {
                 const res = await apiFetch(API + '/api/summary');
-                if (res.status === 401) { promptApiKey(); return; }
+                if (!res || !res.ok) return;
                 const data = await res.json();
 
                 document.getElementById('total-purchase').textContent = formatEUR(data.total_purchase_value_eur);
@@ -294,7 +407,7 @@
         async function loadPositions() {
             try {
                 const res = await apiFetch(API + '/api/positions');
-                if (res.status === 401) { promptApiKey(); return; }
+                if (!res || !res.ok) return;
                 const positions = await res.json();
 
                 const tbody = document.getElementById('positions-table');
@@ -336,7 +449,7 @@
             const days = document.getElementById('chart-period').value;
             try {
                 const res = await apiFetch(API + '/api/history?days=' + days);
-                if (res.status === 401) { promptApiKey(); return; }
+                if (!res || !res.ok) return;
                 const data = await res.json();
 
                 const chartEl = document.getElementById('history-chart');
@@ -418,7 +531,7 @@
                     body: JSON.stringify(data)
                 });
 
-                if (res.status === 401) { promptApiKey(); return; }
+                if (!res) return;
                 if (res.ok) {
                     document.getElementById('add-form').reset();
                     document.getElementById('weight-unit').value = 'oz';
@@ -427,7 +540,12 @@
                     loadAll();
                 } else {
                     const err = await res.json();
-                    alert('Fehler: ' + (err.detail || 'Unbekannt'));
+                    if (res.status === 403) {
+                        // Position-Limit erreicht
+                        alert(err.detail || 'Position-Limit erreicht. Upgrade auf Premium!');
+                    } else {
+                        alert('Fehler: ' + (err.detail || 'Unbekannt'));
+                    }
                 }
             } catch (e) {
                 console.error('Fehler:', e);
@@ -440,30 +558,15 @@
 
             try {
                 const res = await apiFetch(API + '/api/positions/' + id, { method: 'DELETE' });
-                if (res.status === 401) { promptApiKey(); return; }
+                if (!res) return;
                 if (res.ok) loadAll();
             } catch (e) {
                 console.error('Fehler:', e);
             }
         }
 
-        // === API-KEY EINGABE ===
-        function promptApiKey() {
-            const key = prompt('API-Key erforderlich.\n\nBitte gib deinen API-Key ein:');
-            if (key) {
-                API_KEY = key;
-                localStorage.setItem('metaltracker_api_key', key);
-                loadAll();
-            }
-        }
-
-        function clearApiKey() {
-            API_KEY = '';
-            localStorage.removeItem('metaltracker_api_key');
-            alert('API-Key wurde entfernt.');
-        }
-
         function loadAll() {
+            loadUserInfo();
             loadPrices();
             loadSummary();
             loadPositions();
@@ -474,8 +577,25 @@
         document.getElementById('add-form').addEventListener('submit', addPosition);
         document.getElementById('chart-period').addEventListener('change', loadHistory);
 
-        // Init
-        loadAll();
+        // Init - Check Auth first
+        (function init() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check for OAuth token in URL (callback from Google)
+            const urlParams = new URLSearchParams(window.location.search);
+            const oauthToken = urlParams.get('token');
+            if (oauthToken) {
+                localStorage.setItem('metaltracker_token', oauthToken);
+                // Clean URL
+                window.history.replaceState({}, document.title, '/');
+            }
+
+            loadAll();
+        })();
 
         // Auto-refresh alle 5 Minuten
         setInterval(loadAll, 5 * 60 * 1000);

@@ -1,14 +1,12 @@
 import os
-import secrets
 from pathlib import Path
 from datetime import datetime, date, timedelta
 from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, Query, Request, Security
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
-from fastapi.security import APIKeyHeader
+from fastapi.responses import FileResponse
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import func as sql_func
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -18,11 +16,13 @@ import schemas
 from schemas import convert_to_grams
 from database import engine, get_db, Base
 import price_service
+import auth as auth_module
+from routers import auth as auth_router
 
 # === KONFIGURATION ===
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-API_KEY = os.getenv("API_KEY", "")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://metal-tracker-tn-ffb450a69489.herokuapp.com").split(",")
+SESSION_SECRET = os.getenv("SESSION_SECRET", "change-me-in-production")
 
 # Pfad zum static Verzeichnis
 STATIC_DIR = Path(__file__).parent / "static"
@@ -35,24 +35,6 @@ try:
     Base.metadata.create_all(bind=engine, checkfirst=True)
 except Exception:
     pass  # Fehler nicht loggen (keine DB-Details exponieren)
-
-# === API-KEY AUTHENTIFIZIERUNG ===
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-
-async def verify_api_key(api_key: str = Security(api_key_header)):
-    """Prueft den API-Key. Gibt 401 zurueck wenn ungueltig."""
-    if not API_KEY:
-        # Kein API_KEY konfiguriert = Auth deaktiviert (nur fuer Entwicklung!)
-        return None
-    if not api_key or not secrets.compare_digest(api_key, API_KEY):
-        raise HTTPException(
-            status_code=401,
-            detail="Ungültiger oder fehlender API-Key",
-            headers={"WWW-Authenticate": "ApiKey"}
-        )
-    return api_key
-
 
 # === FASTAPI APP ===
 app = FastAPI(
@@ -71,10 +53,16 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS if not DEBUG else ["*"],
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "X-API-Key"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+# Session Middleware (fuer OAuth)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+
+# Auth Router einbinden
+app.include_router(auth_router.router)
 
 
 # === SECURITY HEADERS MIDDLEWARE ===
@@ -97,15 +85,29 @@ async def root(request: Request):
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/login.html", tags=["Root"], include_in_schema=False)
+@limiter.limit("60/minute")
+async def login_page(request: Request):
+    """Serve die Login-Seite"""
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/register.html", tags=["Root"], include_in_schema=False)
+@limiter.limit("60/minute")
+async def register_page(request: Request):
+    """Serve die Registrierungs-Seite"""
+    return FileResponse(STATIC_DIR / "register.html")
+
+
 @app.get("/api", tags=["Root"])
 @limiter.limit("60/minute")
 async def api_info(request: Request):
     """API Status und Info"""
     return {
         "name": "Metal Tracker API",
-        "version": "2.1.0",
+        "version": "3.0.0",
         "status": "running",
-        "auth_required": bool(API_KEY),
+        "auth_type": "jwt",
         "docs": "/docs" if DEBUG else None
     }
 
@@ -152,14 +154,22 @@ async def create_position(
     request: Request,
     position: schemas.PositionCreate,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Neue Position hinzufuegen"""
+    # Tier-Limit pruefen
+    if not auth_module.check_position_limit(db, user):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Position-Limit erreicht ({auth_module.TIER_LIMITS[user.tier]} Positionen fuer {user.tier}-Tier). Upgrade auf Premium fuer unbegrenzte Positionen!"
+        )
+
     # Gesamtgewicht in Gramm berechnen: Anzahl * Gewicht pro Stueck
     weight_per_unit_grams = convert_to_grams(position.weight_per_unit, position.weight_unit.value)
     total_weight_grams = weight_per_unit_grams * position.quantity
 
     db_position = models.Position(
+        user_id=user.id,
         metal_type=position.metal_type.value,
         product_type=position.product_type.value,
         description=position.description,
@@ -176,10 +186,10 @@ async def create_position(
 
     # Historische Snapshots erstellen wenn Kaufdatum vorhanden
     if db_position.purchase_date:
-        await backfill_snapshots(db, db_position)
+        await backfill_snapshots(db, db_position, user)
 
     # Snapshot aktualisieren
-    await update_daily_snapshot(db)
+    await update_daily_snapshot(db, user)
 
     return await enrich_position(db_position)
 
@@ -191,10 +201,10 @@ async def get_positions(
     metal_type: Optional[schemas.MetalType] = Query(None, description="Nach Metallart filtern"),
     product_type: Optional[schemas.ProductType] = Query(None, description="Nach Produktart filtern"),
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Alle Positionen abrufen"""
-    query = db.query(models.Position)
+    query = db.query(models.Position).filter(models.Position.user_id == user.id)
 
     if metal_type:
         query = query.filter(models.Position.metal_type == metal_type.value)
@@ -211,10 +221,13 @@ async def get_position(
     request: Request,
     position_id: int,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Einzelne Position abrufen"""
-    position = db.query(models.Position).filter(models.Position.id == position_id).first()
+    position = db.query(models.Position).filter(
+        models.Position.id == position_id,
+        models.Position.user_id == user.id
+    ).first()
 
     if not position:
         raise HTTPException(status_code=404, detail="Position nicht gefunden")
@@ -229,10 +242,13 @@ async def update_position(
     position_id: int,
     position_update: schemas.PositionUpdate,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Position aktualisieren"""
-    position = db.query(models.Position).filter(models.Position.id == position_id).first()
+    position = db.query(models.Position).filter(
+        models.Position.id == position_id,
+        models.Position.user_id == user.id
+    ).first()
 
     if not position:
         raise HTTPException(status_code=404, detail="Position nicht gefunden")
@@ -263,7 +279,7 @@ async def update_position(
     db.refresh(position)
 
     # Snapshot aktualisieren
-    await update_daily_snapshot(db)
+    await update_daily_snapshot(db, user)
 
     return await enrich_position(position)
 
@@ -274,10 +290,13 @@ async def delete_position(
     request: Request,
     position_id: int,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Position loeschen"""
-    position = db.query(models.Position).filter(models.Position.id == position_id).first()
+    position = db.query(models.Position).filter(
+        models.Position.id == position_id,
+        models.Position.user_id == user.id
+    ).first()
 
     if not position:
         raise HTTPException(status_code=404, detail="Position nicht gefunden")
@@ -286,7 +305,7 @@ async def delete_position(
     db.commit()
 
     # Snapshot aktualisieren
-    await update_daily_snapshot(db)
+    await update_daily_snapshot(db, user)
 
     return {"message": "Position geloescht", "id": position_id}
 
@@ -298,10 +317,10 @@ async def delete_position(
 async def get_portfolio_summary(
     request: Request,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Portfolio-Zusammenfassung mit Gesamtwert abrufen"""
-    positions = db.query(models.Position).all()
+    positions = db.query(models.Position).filter(models.Position.user_id == user.id).all()
 
     if not positions:
         return schemas.PortfolioSummary(
@@ -375,12 +394,13 @@ async def get_portfolio_history(
     request: Request,
     days: int = Query(30, ge=7, le=365, description="Anzahl Tage"),
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Portfolio-Verlauf abrufen"""
     start_date = date.today() - timedelta(days=days)
 
     snapshots = db.query(models.PortfolioSnapshot).filter(
+        models.PortfolioSnapshot.user_id == user.id,
         models.PortfolioSnapshot.date >= start_date
     ).order_by(models.PortfolioSnapshot.date.asc()).all()
 
@@ -405,10 +425,10 @@ async def get_portfolio_history(
 async def create_snapshot(
     request: Request,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    user: models.User = Depends(auth_module.get_current_user)
 ):
     """Manuell einen Snapshot erstellen"""
-    await update_daily_snapshot(db)
+    await update_daily_snapshot(db, user)
     return {"message": "Snapshot erstellt", "date": date.today().isoformat()}
 
 
@@ -442,12 +462,12 @@ async def enrich_position(position: models.Position) -> dict:
     }
 
 
-async def update_daily_snapshot(db: Session):
-    """Erstellt oder aktualisiert den taeglichen Portfolio-Snapshot"""
+async def update_daily_snapshot(db: Session, user: models.User):
+    """Erstellt oder aktualisiert den taeglichen Portfolio-Snapshot fuer einen User"""
     today = date.today()
 
-    # Alle Positionen laden
-    positions = db.query(models.Position).all()
+    # Alle Positionen des Users laden
+    positions = db.query(models.Position).filter(models.Position.user_id == user.id).all()
 
     if not positions:
         return
@@ -465,6 +485,7 @@ async def update_daily_snapshot(db: Session):
 
     # Existierenden Snapshot suchen oder neuen erstellen
     snapshot = db.query(models.PortfolioSnapshot).filter(
+        models.PortfolioSnapshot.user_id == user.id,
         models.PortfolioSnapshot.date == today
     ).first()
 
@@ -478,6 +499,7 @@ async def update_daily_snapshot(db: Session):
         snapshot.positions_count = len(positions)
     else:
         snapshot = models.PortfolioSnapshot(
+            user_id=user.id,
             date=today,
             total_purchase_value_eur=total_purchase,
             total_current_value_eur=total_current,
@@ -492,7 +514,7 @@ async def update_daily_snapshot(db: Session):
     db.commit()
 
 
-async def backfill_snapshots(db: Session, position: models.Position):
+async def backfill_snapshots(db: Session, position: models.Position, user: models.User):
     """Erstellt rueckwirkend Snapshots ab dem Kaufdatum einer Position"""
     import random
 
@@ -510,14 +532,15 @@ async def backfill_snapshots(db: Session, position: models.Position):
     # Aktuelle Preise holen
     current_prices = await price_service.fetch_live_prices()
 
-    # Alle Positionen fuer Gesamtberechnung
-    all_positions = db.query(models.Position).all()
+    # Alle Positionen des Users fuer Gesamtberechnung
+    all_positions = db.query(models.Position).filter(models.Position.user_id == user.id).all()
 
     # Fuer jeden Tag seit Kaufdatum
     current_date = start_date
     while current_date < today:
-        # Pruefen ob Snapshot schon existiert
+        # Pruefen ob Snapshot schon existiert fuer diesen User
         existing = db.query(models.PortfolioSnapshot).filter(
+            models.PortfolioSnapshot.user_id == user.id,
             models.PortfolioSnapshot.date == current_date
         ).first()
 
@@ -544,6 +567,7 @@ async def backfill_snapshots(db: Session, position: models.Position):
 
             if total_purchase > 0:  # Nur wenn es Positionen gab
                 snapshot = models.PortfolioSnapshot(
+                    user_id=user.id,
                     date=current_date,
                     total_purchase_value_eur=total_purchase,
                     total_current_value_eur=total_current,

@@ -125,3 +125,39 @@ class PortfolioSnapshot(BaseModel):
 class PortfolioHistory(BaseModel):
     snapshots: list[PortfolioSnapshot]
     period_days: int
+
+
+# === AUTH SCHEMAS ===
+
+class UserCreate(BaseModel):
+    email: str = Field(..., min_length=5, max_length=255, pattern=r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+    password: str = Field(..., min_length=8, max_length=100)
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    tier: str
+    is_admin: bool
+    created_at: datetime
+    positions_count: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int  # Sekunden
+
+
+class TokenData(BaseModel):
+    user_id: int
+    email: str
+    tier: str

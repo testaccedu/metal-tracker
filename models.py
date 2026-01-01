@@ -1,12 +1,39 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Date
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+
+
+class User(Base):
+    """User-Model fuer Multi-Tenant SaaS"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=True)  # Null bei OAuth-only Users
+
+    # OAuth Provider IDs
+    google_id = Column(String, unique=True, nullable=True, index=True)
+
+    # Subscription Tier
+    tier = Column(String, default="free")  # "free" | "premium"
+
+    # Account Status
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    positions = relationship("Position", back_populates="user", cascade="all, delete-orphan")
 
 
 class Position(Base):
     __tablename__ = "positions"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     metal_type = Column(String, nullable=False, index=True)  # gold, silver, platinum, palladium
     product_type = Column(String, nullable=False, default="bar")  # coin, bar, round, granulate, jewelry
     description = Column(String, nullable=True)
@@ -23,13 +50,17 @@ class Position(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
+    # Relationship
+    user = relationship("User", back_populates="positions")
+
 
 class PortfolioSnapshot(Base):
     """Taeglicher Snapshot des Portfolio-Werts fuer Verlaufsanzeige"""
     __tablename__ = "portfolio_snapshots"
 
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)  # unique constraint entfernt (pro user unique)
     total_purchase_value_eur = Column(Float, nullable=False)
     total_current_value_eur = Column(Float, nullable=False)
     total_weight_gold_g = Column(Float, default=0)
