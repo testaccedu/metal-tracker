@@ -393,7 +393,22 @@ async def get_portfolio_history(
     user: models.User = Depends(auth_module.get_current_user)
 ):
     """Portfolio-Verlauf abrufen"""
-    start_date = date.today() - timedelta(days=days)
+    # Automatisch aktuellen Snapshot erstellen falls User Positionen hat
+    # und heute noch kein Snapshot existiert (wichtig fuer taegliche Updates!)
+    today = date.today()
+    today_snapshot = db.query(models.PortfolioSnapshot).filter(
+        models.PortfolioSnapshot.user_id == user.id,
+        models.PortfolioSnapshot.date == today
+    ).first()
+
+    positions_count = db.query(models.Position).filter(
+        models.Position.user_id == user.id
+    ).count()
+
+    if not today_snapshot and positions_count > 0:
+        await update_daily_snapshot(db, user)
+
+    start_date = today - timedelta(days=days)
 
     snapshots = db.query(models.PortfolioSnapshot).filter(
         models.PortfolioSnapshot.user_id == user.id,
