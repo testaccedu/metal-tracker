@@ -14,30 +14,34 @@ Edelmetall-Portfolio-Tracker als Multi-User SaaS. Verwaltet Positionen in Gold, 
 ## Projektstruktur
 ```
 metal-tracker/
-├── main.py           # FastAPI App, Endpoints, Middleware
-├── models.py         # SQLAlchemy Models (User, Position, PortfolioSnapshot)
-├── schemas.py        # Pydantic Schemas, Validierung
-├── auth.py           # JWT-Logik, Password-Hashing, User-Dependencies
-├── database.py       # DB-Verbindung
-├── price_service.py  # GOLD.DE API Integration
+├── main.py              # FastAPI App, Endpoints, Middleware
+├── models.py            # SQLAlchemy Models (User, Position, PortfolioSnapshot, ApiKey)
+├── schemas.py           # Pydantic Schemas, Validierung
+├── auth.py              # JWT-Logik, Password-Hashing, API-Key-Validierung
+├── database.py          # DB-Verbindung
+├── price_service.py     # GOLD.DE API Integration
+├── scheduler_snapshots.py # Heroku Scheduler: Taegliche Snapshots
 ├── routers/
-│   └── auth.py       # Auth-Endpoints (Login, Register, OAuth)
+│   └── auth.py          # Auth-Endpoints (Login, Register, OAuth, API-Keys)
 ├── static/
-│   ├── index.html    # Dashboard (nach Login)
-│   ├── login.html    # Login-Seite
-│   └── register.html # Registrierung
-├── migrate_to_saas.py # Migrations-Script
-├── reset_db.py       # DB-Reset (VORSICHT!)
-├── requirements.txt  # Dependencies
-├── Procfile          # Heroku Config
-└── .env.example      # Environment-Variablen Vorlage
+│   ├── index.html       # Dashboard (nach Login)
+│   ├── login.html       # Login-Seite
+│   └── register.html    # Registrierung
+├── migrate_to_saas.py   # Migrations-Script
+├── reset_db.py          # DB-Reset (VORSICHT!)
+├── requirements.txt     # Dependencies
+├── .python-version      # Python Version (3.11)
+├── Procfile             # Heroku Config
+└── .env.example         # Environment-Variablen Vorlage
 ```
 
 ## Auth-System
-- **JWT Token:** 60 Minuten Gueltigkeit
+- **JWT Token:** 60 Minuten Gueltigkeit, fuer Web-UI
+- **API-Keys:** Fuer programmatischen Zugriff (Prefix: `mt_`), max 5 pro User
 - **Email/Passwort:** bcrypt-Hashing via passlib
 - **Google OAuth:** Optional, via authlib
 - **Tiers:** Free (max 10 Positionen), Premium (unbegrenzt)
+- **Auth-Reihenfolge:** API-Key (X-API-Key Header) > JWT (Authorization: Bearer)
 
 ## Wichtige Endpoints
 | Methode | Endpoint | Auth | Beschreibung |
@@ -46,6 +50,9 @@ metal-tracker/
 | POST | /api/auth/login | Nein | Login -> JWT |
 | GET | /api/auth/me | Ja | Aktueller User |
 | GET | /api/auth/google | Nein | Google OAuth Start |
+| POST | /api/auth/api-keys | Ja | API-Key erstellen |
+| GET | /api/auth/api-keys | Ja | API-Keys auflisten |
+| DELETE | /api/auth/api-keys/{id} | Ja | API-Key loeschen |
 | GET | /api/prices | Nein | Live-Preise von GOLD.DE |
 | GET | /api/positions | Ja | Alle Positionen des Users |
 | POST | /api/positions | Ja | Position erstellen |
@@ -55,11 +62,23 @@ metal-tracker/
 
 ## Security
 - **JWT Auth:** Bearer Token im Authorization Header
+- **API-Key Auth:** X-API-Key Header (SHA256 gehasht gespeichert)
 - **Rate Limiting:** 20-60 req/min (slowapi)
 - **CORS:** Nur eigene Domain
 - **Security Headers:** HSTS, X-Frame-Options, etc.
 - **XSS-Schutz:** escapeHtml() im Frontend
 - **Multi-Tenant:** Alle Queries gefiltert nach user_id
+
+## Heroku Scheduler
+Taegliche Snapshot-Erstellung fuer alle User mit Positionen:
+```bash
+# Job im Scheduler Dashboard konfigurieren:
+# Command: python scheduler_snapshots.py
+# Frequency: Daily (z.B. 06:00 UTC)
+
+# Scheduler Dashboard oeffnen:
+heroku addons:open scheduler --app metal-tracker-tn
+```
 
 ## Environment-Variablen
 ```
@@ -143,3 +162,14 @@ heroku pg:backups:restore <backup-id> --app metal-tracker-tn
 - Historische Daten werden ab Positionserstellung gesammelt (keine Backfill-Funktion)
 - CDN-Abhaengigkeit fuer Tailwind/Chart.js
 - passlib 1.7.4 zeigt Warnung mit bcrypt 4.2.0 (funktioniert aber)
+
+## API-Nutzung mit API-Key
+```bash
+# API-Key im Dashboard erstellen, dann:
+curl -X GET "https://metal-tracker-tn-ffb450a69489.herokuapp.com/api/positions" \
+  -H "X-API-Key: mt_dein_api_key_hier"
+
+# Oder mit Authorization Header (JWT):
+curl -X GET "https://metal-tracker-tn-ffb450a69489.herokuapp.com/api/positions" \
+  -H "Authorization: Bearer <jwt_token>"
+```
