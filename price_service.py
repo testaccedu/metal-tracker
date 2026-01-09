@@ -97,9 +97,24 @@ async def get_all_prices() -> dict[str, dict]:
     return result
 
 
-async def calculate_current_value(metal_type: str, weight_grams: float) -> float:
-    """Berechnet den aktuellen Ankaufswert einer Position"""
+async def calculate_current_value(metal_type: str, weight_grams: float, discount_percent: float = 0.0) -> float:
+    """
+    Berechnet den aktuellen Ankaufswert einer Position
+
+    Args:
+        metal_type: Art des Edelmetalls (gold, silver, platinum, palladium)
+        weight_grams: Gewicht in Gramm
+        discount_percent: Zusaetzlicher Abschlag in Prozent (z.B. 5.0 fuer 5%)
+
+    Returns:
+        Aktueller Wert in EUR (Ankaufspreis minus Abschlag)
+    """
     price_per_gram = await get_price_per_gram(metal_type)
+
+    # Abschlag anwenden (z.B. 5% Abschlag -> Faktor 0.95)
+    if discount_percent > 0:
+        price_per_gram = price_per_gram * (1 - discount_percent / 100)
+
     return round(price_per_gram * weight_grams, 2)
 
 

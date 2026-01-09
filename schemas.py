@@ -54,6 +54,7 @@ class PositionBase(BaseModel):
     weight_unit: WeightUnit = WeightUnit.OUNCE
     purchase_price_eur: float = Field(..., gt=0, le=100000000, description="Gesamtkaufpreis in EUR (max 100M)")
     purchase_date: Optional[date] = None
+    discount_percent: Optional[float] = Field(None, ge=0, le=100, description="Abschlag in Prozent (0-100%). Wenn nicht gesetzt, wird der Default des Users verwendet.")
 
 
 class PositionCreate(PositionBase):
@@ -69,6 +70,7 @@ class PositionUpdate(BaseModel):
     weight_unit: Optional[WeightUnit] = None
     purchase_price_eur: Optional[float] = Field(None, gt=0, le=100000000)
     purchase_date: Optional[date] = None
+    discount_percent: Optional[float] = Field(None, ge=0, le=100)
 
 
 class Position(BaseModel):
@@ -82,6 +84,7 @@ class Position(BaseModel):
     weight_grams: float  # Gesamtgewicht
     purchase_price_eur: float
     purchase_date: Optional[date] = None
+    discount_percent: Optional[float] = None
     created_at: datetime
     updated_at: datetime
     # Berechnete Felder
@@ -187,3 +190,26 @@ class ApiKeyCreated(BaseModel):
     name: str
     api_key: str
     created_at: datetime
+
+
+# === USER SETTINGS SCHEMAS ===
+
+class UserSettingsUpdate(BaseModel):
+    """User-Settings Update (nur die Felder die geaendert werden sollen)"""
+    default_discount_gold: Optional[float] = Field(None, ge=0, le=100, description="Default-Abschlag Gold in %")
+    default_discount_silver: Optional[float] = Field(None, ge=0, le=100, description="Default-Abschlag Silber in %")
+    default_discount_platinum: Optional[float] = Field(None, ge=0, le=100, description="Default-Abschlag Platin in %")
+    default_discount_palladium: Optional[float] = Field(None, ge=0, le=100, description="Default-Abschlag Palladium in %")
+
+
+class UserSettingsResponse(BaseModel):
+    """User-Settings Response"""
+    default_discount_gold: float
+    default_discount_silver: float
+    default_discount_platinum: float
+    default_discount_palladium: float
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

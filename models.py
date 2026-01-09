@@ -28,6 +28,7 @@ class User(Base):
     # Relationships
     positions = relationship("Position", back_populates="user", cascade="all, delete-orphan")
     api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
+    settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class Position(Base):
@@ -47,6 +48,10 @@ class Position(Base):
 
     purchase_price_eur = Column(Float, nullable=False)  # Gesamtpreis fuer alle Stuecke
     purchase_date = Column(Date, nullable=True)
+
+    # Abschlag in Prozent (z.B. 5.0 fuer 5% unter Marktpreis)
+    # Optional - wenn nicht gesetzt, wird der Default aus UserSettings verwendet
+    discount_percent = Column(Float, nullable=True, default=None)
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -88,3 +93,24 @@ class ApiKey(Base):
 
     # Relationship
     user = relationship("User", back_populates="api_keys")
+
+
+class UserSettings(Base):
+    """User-spezifische Einstellungen (Default-Abschlaege pro Edelmetall)"""
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+
+    # Default-Abschlaege pro Edelmetall in Prozent (z.B. 5.0 fuer 5%)
+    # Diese werden verwendet wenn eine Position keinen spezifischen Abschlag hat
+    default_discount_gold = Column(Float, nullable=False, default=0.0)
+    default_discount_silver = Column(Float, nullable=False, default=0.0)
+    default_discount_platinum = Column(Float, nullable=False, default=0.0)
+    default_discount_palladium = Column(Float, nullable=False, default=0.0)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationship
+    user = relationship("User", back_populates="settings")

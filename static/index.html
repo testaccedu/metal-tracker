@@ -46,6 +46,9 @@
                             <p class="text-xs text-gray-500">Positionen</p>
                             <p class="text-sm"><span id="positions-used">0</span> / <span id="positions-limit">10</span></p>
                         </div>
+                        <button onclick="showSettingsModal()" class="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 transition">
+                            Einstellungen
+                        </button>
                         <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-gray-700 rounded-b-lg transition">
                             Abmelden
                         </button>
@@ -148,7 +151,7 @@
         <!-- Neue Position -->
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
             <h2 class="font-semibold mb-4">Neue Position</h2>
-            <form id="add-form" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <form id="add-form" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">Metall</label>
                     <select id="metal-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
@@ -199,6 +202,12 @@
                     <label class="block text-xs text-gray-400 mb-1">Kaufdatum</label>
                     <input type="date" id="purchase-date"
                            class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Abschlag %</label>
+                    <input type="number" id="discount-percent" step="0.1" min="0" max="100" placeholder="Optional"
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none"
+                           title="Optional: Abschlag in %. Wenn leer, wird der Default-Wert verwendet.">
                 </div>
                 <div class="flex items-end">
                     <button type="submit"
@@ -293,6 +302,50 @@
             <button onclick="hideShowKeyModal()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
                 Verstanden
             </button>
+        </div>
+    </div>
+
+    <!-- Modal: Einstellungen (Default-Abschlaege) -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 class="text-lg font-semibold mb-2">Einstellungen</h3>
+            <p class="text-gray-400 text-sm mb-4">Default-Abschlaege pro Edelmetall (in %). Diese werden verwendet, wenn eine Position keinen spezifischen Abschlag hat.</p>
+
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Gold - Default-Abschlag %</label>
+                    <input type="number" id="settings-gold" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Silber - Default-Abschlag %</label>
+                    <input type="number" id="settings-silver" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Platin - Default-Abschlag %</label>
+                    <input type="number" id="settings-platinum" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Palladium - Default-Abschlag %</label>
+                    <input type="number" id="settings-palladium" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+            </div>
+
+            <p class="text-xs text-gray-500 mb-4">
+                Die Abschlaege werden zusaetzlich zum allgemeinen Ankaufsfaktor (95% vom Spot) angewendet.
+            </p>
+
+            <div class="flex gap-3">
+                <button onclick="hideSettingsModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 rounded transition">
+                    Abbrechen
+                </button>
+                <button onclick="saveSettings()" class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
+                    Speichern
+                </button>
+            </div>
         </div>
     </div>
 
@@ -566,6 +619,8 @@
         async function addPosition(e) {
             e.preventDefault();
 
+            const discountValue = document.getElementById('discount-percent').value;
+
             const data = {
                 metal_type: document.getElementById('metal-type').value,
                 product_type: document.getElementById('product-type').value,
@@ -574,7 +629,8 @@
                 weight_per_unit: parseFloat(document.getElementById('weight').value),
                 weight_unit: document.getElementById('weight-unit').value,
                 purchase_price_eur: parseFloat(document.getElementById('purchase-price').value),
-                purchase_date: document.getElementById('purchase-date').value || null
+                purchase_date: document.getElementById('purchase-date').value || null,
+                discount_percent: discountValue ? parseFloat(discountValue) : null
             };
 
             try {
@@ -728,6 +784,60 @@
                 if (res.ok) loadApiKeys();
             } catch (e) {
                 console.error('Fehler:', e);
+            }
+        }
+
+        // === SETTINGS ===
+
+        async function showSettingsModal() {
+            toggleUserMenu(); // Menu schliessen
+            try {
+                const res = await apiFetch(API + '/api/settings');
+                if (!res) return;
+                if (res.ok) {
+                    const settings = await res.json();
+                    document.getElementById('settings-gold').value = settings.default_discount_gold || 0;
+                    document.getElementById('settings-silver').value = settings.default_discount_silver || 0;
+                    document.getElementById('settings-platinum').value = settings.default_discount_platinum || 0;
+                    document.getElementById('settings-palladium').value = settings.default_discount_palladium || 0;
+                    document.getElementById('settings-modal').classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error('Fehler beim Laden der Einstellungen:', e);
+            }
+        }
+
+        function hideSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        async function saveSettings() {
+            const data = {
+                default_discount_gold: parseFloat(document.getElementById('settings-gold').value) || 0,
+                default_discount_silver: parseFloat(document.getElementById('settings-silver').value) || 0,
+                default_discount_platinum: parseFloat(document.getElementById('settings-platinum').value) || 0,
+                default_discount_palladium: parseFloat(document.getElementById('settings-palladium').value) || 0
+            };
+
+            try {
+                const res = await apiFetch(API + '/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!res) return;
+                if (res.ok) {
+                    hideSettingsModal();
+                    // Portfolio neu laden, da sich Werte geaendert haben koennten
+                    loadAll();
+                } else {
+                    const err = await res.json();
+                    alert('Fehler: ' + (err.detail || 'Unbekannt'));
+                }
+            } catch (e) {
+                console.error('Fehler:', e);
+                alert('Fehler beim Speichern');
             }
         }
 
