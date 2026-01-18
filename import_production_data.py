@@ -11,6 +11,7 @@ Verwendung:
 """
 import os
 import sys
+import sqlalchemy as sa
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import models
@@ -33,23 +34,23 @@ if HEROKU_DATABASE_URL.startswith("postgres://"):
 # Lokale SQLite DB
 LOCAL_DB = "sqlite:///./metal_tracker.db"
 
-print("🔄 Import von Produktionsdaten...")
-print(f"   Quelle: Heroku PostgreSQL")
-print(f"   Ziel:   Lokale SQLite DB\n")
+print("[*] Import von Produktionsdaten...")
+print("    Quelle: Heroku PostgreSQL")
+print("    Ziel:   Lokale SQLite DB\n")
 
 try:
     # Verbindung zu Heroku PostgreSQL
-    print("📡 Verbinde zu Heroku-DB...")
+    print("[*] Verbinde zu Heroku-DB...")
     heroku_engine = create_engine(HEROKU_DATABASE_URL)
     HerokuSession = sessionmaker(bind=heroku_engine)
     heroku_db = HerokuSession()
 
     # Verbindung zu lokaler SQLite
-    print("💾 Verbinde zu lokaler SQLite-DB...")
+    print("[*] Verbinde zu lokaler SQLite-DB...")
     local_engine = create_engine(LOCAL_DB)
 
     # Lokale DB leeren und neu erstellen
-    print("🗑️  Loesche alte lokale Daten...")
+    print("[*] Loesche alte lokale Daten...")
     Base.metadata.drop_all(local_engine)
     Base.metadata.create_all(local_engine)
 
@@ -75,12 +76,27 @@ try:
         table_exists = result.scalar()
 
         if not table_exists:
-            print(f"⚠️  Tabelle '{table_name}' existiert nicht in Heroku-DB, überspringe...")
+            print(f"[!] Tabelle '{table_name}' existiert nicht in Heroku-DB, ueberspringe...")
             continue
 
-        # Daten laden
-        print(f"📥 Importiere {table_name}...", end=" ")
-        records = heroku_db.query(model_class).all()
+        # Existierende Spalten in Heroku-DB prüfen
+        inspector = sa.inspect(heroku_db.bind)
+        heroku_columns = {col['name'] for col in inspector.get_columns(table_name)}
+
+        # Daten laden mit nur existierenden Spalten
+        print(f"[*] Importiere {table_name}...", end=" ")
+
+        # Baue SELECT nur mit existierenden Spalten
+        columns_to_select = []
+        for column in model_class.__table__.columns:
+            if column.name in heroku_columns:
+                columns_to_select.append(column)
+
+        if not columns_to_select:
+            print("(keine passenden Spalten)")
+            continue
+
+        records = heroku_db.query(*columns_to_select).all()
 
         if not records:
             print("(leer)")
@@ -88,10 +104,10 @@ try:
 
         # Daten in lokale DB schreiben
         for record in records:
-            # Kopiere Attribute
+            # Kopiere nur existierende Attribute
             record_dict = {}
-            for column in record.__table__.columns:
-                record_dict[column.name] = getattr(record, column.name)
+            for i, column in enumerate(columns_to_select):
+                record_dict[column.name] = record[i]
 
             local_record = model_class(**record_dict)
             local_db.add(local_record)
@@ -99,17 +115,17 @@ try:
         local_db.commit()
         count = len(records)
         total_imported += count
-        print(f"✅ {count} Einträge")
+        print(f"[OK] {count} Eintraege")
 
     heroku_db.close()
     local_db.close()
 
-    print(f"\n✅ Import abgeschlossen! {total_imported} Einträge importiert.")
-    print("\n🧪 Du kannst jetzt lokal mit Produktionsdaten testen:")
-    print("   python main.py")
+    print(f"\n[OK] Import abgeschlossen! {total_imported} Eintraege importiert.")
+    print("\n[*] Du kannst jetzt lokal mit Produktionsdaten testen:")
+    print("    python main.py")
 
 except Exception as e:
-    print(f"\n❌ FEHLER beim Import: {e}")
+    print(f"\n[ERROR] FEHLER beim Import: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
