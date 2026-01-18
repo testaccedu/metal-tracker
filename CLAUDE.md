@@ -128,6 +128,67 @@ python main.py
 # Test-Login: admin@local.dev / testpassword123
 ```
 
+## Datenbank-Migrations-Workflow (KRITISCH!)
+
+### REGEL: Vor JEDER DB-Schema-Änderung
+
+**NIEMALS** direkt `models.py` ändern und deployen! **IMMER** diesen Workflow befolgen:
+
+#### 1. Backup erstellen
+```bash
+# Heroku-DB sichern
+heroku pg:backups:capture --app metal-tracker-tn
+
+# Backup lokal herunterladen
+heroku pg:backups:url b001 --app metal-tracker-tn  # b001 = neuestes Backup
+curl -o "backups/heroku_backup_$(date +%Y%m%d_%H%M%S).dump" "<backup-url>"
+```
+
+#### 2. Lokale DB mit Produktionsdaten befüllen
+```bash
+# Script zum Import von PostgreSQL Dump in SQLite
+python import_production_data.py
+```
+
+#### 3. Alembic Migration erstellen
+```bash
+# NACH Änderung in models.py:
+alembic revision --autogenerate -m "Beschreibung der Änderung"
+
+# Migration prüfen in: alembic/versions/XXX_beschreibung.py
+# WICHTIG: Autogenerate kann Dinge übersehen! Immer manuell prüfen!
+```
+
+#### 4. Lokal testen (mit Produktionsdaten!)
+```bash
+# Migration lokal anwenden
+alembic upgrade head
+
+# App lokal starten und testen
+python main.py
+
+# Bei Problemen: Migration zurückrollen
+alembic downgrade -1
+```
+
+#### 5. Erst dann deployen
+```bash
+# WENN lokaler Test erfolgreich:
+git add alembic/versions/*.py models.py
+git commit -m "[MIGRATION] Beschreibung"
+git push heroku master
+
+# Heroku führt Migrationen NICHT automatisch aus!
+# Migrations-Script als Release-Phase in Procfile:
+# release: alembic upgrade head
+```
+
+### Wichtige Hinweise
+- **Produktionsdaten lokal testen:** Verhindert Datenverlust bei Schema-Änderungen
+- **Alembic Migrations sind Pflicht:** Kein `Base.metadata.create_all()` mehr auf Produktion!
+- **Backups vor JEDEM Deployment:** Schnelle Rollback-Möglichkeit
+- **Migration-Downgrade testen:** Sicherstellen, dass Rollback funktioniert
+
 ## Deployment (Heroku)
 ```bash
 # WICHTIG: Vor Schema-Aenderungen IMMER Backup!
