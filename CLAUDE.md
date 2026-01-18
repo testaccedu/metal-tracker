@@ -43,6 +43,17 @@ metal-tracker/
 - **Tiers:** Free (max 10 Positionen), Premium (unbegrenzt)
 - **Auth-Reihenfolge:** API-Key (X-API-Key Header) > JWT (Authorization: Bearer)
 
+## Discount-System
+- **Spot-Preise:** Live-Preise von GOLD.DE (100% Spot, keine fixen Abschlaege mehr)
+- **User-Settings:** Jeder User kann Default-Abschlaege pro Metall konfigurieren (0-100%)
+  - `default_discount_gold`: Standard-Abschlag fuer Gold-Positionen
+  - `default_discount_silver`: Standard-Abschlag fuer Silber-Positionen
+  - `default_discount_platinum`: Standard-Abschlag fuer Platin-Positionen
+  - `default_discount_palladium`: Standard-Abschlag fuer Palladium-Positionen
+- **Position-Discount:** Jede Position kann einen eigenen Discount haben (ueberschreibt User-Default)
+- **Berechnung:** `Wert = Spot-Preis × (1 - Discount/100) × Gewicht`
+- **Beispiel:** Gold-Position mit 5% Discount → 95% vom Spot-Preis
+
 ## Wichtige Endpoints
 | Methode | Endpoint | Auth | Beschreibung |
 |---------|----------|------|--------------|
@@ -53,7 +64,9 @@ metal-tracker/
 | POST | /api/auth/api-keys | Ja | API-Key erstellen |
 | GET | /api/auth/api-keys | Ja | API-Keys auflisten |
 | DELETE | /api/auth/api-keys/{id} | Ja | API-Key loeschen |
-| GET | /api/prices | Nein | Live-Preise von GOLD.DE |
+| GET | /api/settings | Ja | User-Settings abrufen |
+| PUT | /api/settings | Ja | User-Settings aktualisieren |
+| GET | /api/prices | Nein | Live-Preise von GOLD.DE (Spot) |
 | GET | /api/positions | Ja | Alle Positionen des Users |
 | POST | /api/positions | Ja | Position erstellen |
 | DELETE | /api/positions/{id} | Ja | Position loeschen |
@@ -162,6 +175,7 @@ heroku pg:backups:restore <backup-id> --app metal-tracker-tn
 - Historische Daten werden ab Positionserstellung gesammelt (keine Backfill-Funktion)
 - CDN-Abhaengigkeit fuer Tailwind/Chart.js
 - passlib 1.7.4 zeigt Warnung mit bcrypt 4.2.0 (funktioniert aber)
+- Spot-Preise von GOLD.DE, Discounts werden per User konfiguriert
 
 ## API-Nutzung mit API-Key
 ```bash

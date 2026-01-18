@@ -6,7 +6,7 @@ from typing import Optional
 # Copyright: GOLD.DE - Preise ohne Gewaehr
 
 CACHE_DURATION_MINUTES = 5
-ANKAUF_FAKTOR = 0.95  # 95% vom Spot = realistischer Ankaufswert
+# HINWEIS: Discounts werden direkt in den User-Settings konfiguriert (default_discount_*)
 
 # Cache fuer Preise
 _price_cache: dict = {}
@@ -47,8 +47,8 @@ async def fetch_live_prices() -> dict[str, float]:
                 if api_field in data:
                     price_per_oz = data[api_field]
                     price_per_gram = price_per_oz / GRAMS_PER_OZ
-                    # Ankaufspreis = 95% vom Spot
-                    prices[metal] = price_per_gram * ANKAUF_FAKTOR
+                    # Spot-Preis ohne Abschlag (Discounts werden per User-Settings angewendet)
+                    prices[metal] = price_per_gram
 
             _price_cache = prices
             _cache_timestamp = datetime.now()
@@ -63,17 +63,17 @@ async def fetch_live_prices() -> dict[str, float]:
 
 
 def get_fallback_prices() -> dict[str, float]:
-    """Fallback-Preise falls API nicht verfuegbar (EUR pro Gramm, Ankauf ~95%)"""
+    """Fallback-Preise falls API nicht verfuegbar (EUR pro Gramm, Spot-Preis)"""
     return {
-        "gold": 112.50,      # ~118 Spot * 0.95
-        "silver": 1.86,      # ~1.96 Spot * 0.95
-        "platinum": 53.35,   # ~56.15 Spot * 0.95
-        "palladium": 42.00   # ~44.20 Spot * 0.95
+        "gold": 118.50,      # Spot-Preis Gold
+        "silver": 1.96,      # Spot-Preis Silber
+        "platinum": 56.15,   # Spot-Preis Platin
+        "palladium": 44.20   # Spot-Preis Palladium
     }
 
 
 async def get_price_per_gram(metal_type: str) -> float:
-    """Gibt den aktuellen Ankaufspreis pro Gramm in EUR zurueck"""
+    """Gibt den aktuellen Spot-Preis pro Gramm in EUR zurueck"""
     prices = await fetch_live_prices()
     return prices.get(metal_type.lower(), 0.0)
 
@@ -83,14 +83,10 @@ async def get_all_prices() -> dict[str, dict]:
     prices = await fetch_live_prices()
     result = {}
 
-    for metal, ankauf_per_gram in prices.items():
-        spot_per_gram = ankauf_per_gram / ANKAUF_FAKTOR
+    for metal, spot_per_gram in prices.items():
         result[metal] = {
             "spot_per_gram_eur": round(spot_per_gram, 4),
             "spot_per_oz_eur": round(spot_per_gram * GRAMS_PER_OZ, 2),
-            "ankauf_per_gram_eur": round(ankauf_per_gram, 4),
-            "ankauf_per_oz_eur": round(ankauf_per_gram * GRAMS_PER_OZ, 2),
-            "ankauf_faktor": ANKAUF_FAKTOR,
             "timestamp": _cache_timestamp or datetime.now()
         }
 
@@ -99,23 +95,23 @@ async def get_all_prices() -> dict[str, dict]:
 
 async def calculate_current_value(metal_type: str, weight_grams: float, discount_percent: float = 0.0) -> float:
     """
-    Berechnet den aktuellen Ankaufswert einer Position
+    Berechnet den aktuellen Wert einer Position basierend auf Spot-Preis minus Discount
 
     Args:
         metal_type: Art des Edelmetalls (gold, silver, platinum, palladium)
         weight_grams: Gewicht in Gramm
-        discount_percent: Zusaetzlicher Abschlag in Prozent (z.B. 5.0 fuer 5%)
+        discount_percent: Abschlag vom Spot-Preis in Prozent (z.B. 5.0 fuer 5%)
 
     Returns:
-        Aktueller Wert in EUR (Ankaufspreis minus Abschlag)
+        Aktueller Wert in EUR (Spot-Preis minus Discount)
     """
-    price_per_gram = await get_price_per_gram(metal_type)
+    spot_price_per_gram = await get_price_per_gram(metal_type)
 
-    # Abschlag anwenden (z.B. 5% Abschlag -> Faktor 0.95)
+    # Abschlag vom Spot-Preis anwenden (z.B. 5% Abschlag -> Faktor 0.95)
     if discount_percent > 0:
-        price_per_gram = price_per_gram * (1 - discount_percent / 100)
+        spot_price_per_gram = spot_price_per_gram * (1 - discount_percent / 100)
 
-    return round(price_per_gram * weight_grams, 2)
+    return round(spot_price_per_gram * weight_grams, 2)
 
 
 def get_source_info() -> dict:
@@ -124,6 +120,6 @@ def get_source_info() -> dict:
         "source": "GOLD.DE",
         "api_url": "https://api.edelmetalle.de/public.json",
         "copyright": "Preise von GOLD.DE - ohne Gewaehr",
-        "price_type": "Ankaufspreis (95% vom Spot)",
+        "price_type": "Spot-Preis (Discounts werden per User-Settings angewendet)",
         "cache_minutes": CACHE_DURATION_MINUTES
     }
