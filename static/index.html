@@ -160,77 +160,6 @@
             </div>
         </div>
 
-        <!-- Neue Position -->
-        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 mb-6">
-            <h2 class="font-semibold mb-4">Neue Position</h2>
-            <form id="add-form" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Metall</label>
-                    <select id="metal-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                        <option value="gold">Gold</option>
-                        <option value="silver">Silber</option>
-                        <option value="platinum">Platin</option>
-                        <option value="palladium">Palladium</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Art</label>
-                    <select id="product-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                        <option value="coin">Muenze</option>
-                        <option value="bar">Barren</option>
-                        <option value="round">Medaille</option>
-                        <option value="granulate">Granulat</option>
-                        <option value="jewelry">Schmuck</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Beschreibung</label>
-                    <input type="text" id="description" placeholder="z.B. Kruegerrand"
-                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Anzahl</label>
-                    <input type="number" id="quantity" value="1" min="1" step="1" required
-                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Gewicht/Stk</label>
-                    <div class="flex">
-                        <input type="number" id="weight" step="0.001" min="0" value="1" required
-                               class="w-full bg-gray-700 rounded-l px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                        <select id="weight-unit" class="bg-gray-600 rounded-r px-2 py-2 text-sm focus:outline-none">
-                            <option value="oz">oz</option>
-                            <option value="g">g</option>
-                            <option value="kg">kg</option>
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Kaufpreis ges.</label>
-                    <input type="number" id="purchase-price" step="0.01" min="0" required placeholder="EUR"
-                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Kaufdatum</label>
-                    <input type="date" id="purchase-date"
-                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Abschlag %</label>
-                    <input type="number" id="discount-percent" step="0.1" min="0" max="100" placeholder="Optional"
-                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none"
-                           title="Optional: Abschlag in %. Wenn leer, wird der Default-Wert verwendet.">
-                </div>
-                <div class="flex items-end sm:col-span-2 lg:col-span-1">
-                    <button type="submit"
-                            class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 px-4 rounded text-sm transition">
-                        <span class="sm:hidden">Position hinzufügen</span>
-                        <span class="hidden sm:inline">+</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-
         <!-- Positionen Tabelle -->
         <div class="bg-gray-800 rounded-lg p-4">
             <div class="flex justify-between items-center mb-4">
@@ -267,24 +196,107 @@
             </div>
         </div>
 
-        <!-- API Keys Section -->
-        <div class="bg-gray-800 rounded-lg p-4 mt-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="font-semibold">API-Keys</h2>
-                <button onclick="showCreateKeyModal()" class="bg-yellow-600 hover:bg-yellow-500 text-black text-sm font-bold px-3 py-1 rounded transition">
-                    + Neuer Key
-                </button>
-            </div>
-            <p class="text-gray-400 text-sm mb-4">Erstelle API-Keys fuer programmatischen Zugriff auf dein Portfolio.</p>
-            <div id="api-keys-list" class="space-y-2">
-                <p class="text-gray-500 text-sm">Lade API-Keys...</p>
-            </div>
-        </div>
-
         <!-- Footer -->
-        <footer class="mt-6 text-center text-gray-600 text-xs">
+        <footer class="mt-6 pb-16 text-center text-gray-600 text-xs">
             <p>Preise von GOLD.DE - ohne Gewaehr</p>
         </footer>
+    </div>
+
+    <!-- Floating Action Button (FAB) -->
+    <button onclick="showAddPositionModal()"
+            class="fixed bottom-6 right-6 w-14 h-14 bg-yellow-600 hover:bg-yellow-500 text-black rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40 hover:scale-110"
+            title="Neue Position hinzufuegen">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+        </svg>
+    </button>
+
+    <!-- Modal: Neue Position -->
+    <div id="add-position-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Neue Position</h3>
+                <button onclick="hideAddPositionModal()" class="text-gray-400 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="add-form" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Metall</label>
+                        <select id="metal-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                            <option value="gold">Gold</option>
+                            <option value="silver">Silber</option>
+                            <option value="platinum">Platin</option>
+                            <option value="palladium">Palladium</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Art</label>
+                        <select id="product-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                            <option value="coin">Muenze</option>
+                            <option value="bar">Barren</option>
+                            <option value="round">Medaille</option>
+                            <option value="granulate">Granulat</option>
+                            <option value="jewelry">Schmuck</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Beschreibung</label>
+                    <input type="text" id="description" placeholder="z.B. Kruegerrand 1oz"
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Anzahl</label>
+                        <input type="number" id="quantity" value="1" min="1" step="1" required
+                               class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Gewicht pro Stueck</label>
+                        <div class="flex">
+                            <input type="number" id="weight" step="0.001" min="0" value="1" required
+                                   class="w-full bg-gray-700 rounded-l px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                            <select id="weight-unit" class="bg-gray-600 rounded-r px-2 py-2 text-sm focus:outline-none">
+                                <option value="oz">oz</option>
+                                <option value="g">g</option>
+                                <option value="kg">kg</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Kaufpreis gesamt (EUR)</label>
+                        <input type="number" id="purchase-price" step="0.01" min="0" required placeholder="0.00"
+                               class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Kaufdatum</label>
+                        <input type="date" id="purchase-date"
+                               class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Abschlag % <span class="text-gray-500">(optional)</span></label>
+                    <input type="number" id="discount-percent" step="0.1" min="0" max="100" placeholder="Leer = Default-Wert"
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none"
+                           title="Optional: Abschlag in %. Wenn leer, wird der Default-Wert aus den Einstellungen verwendet.">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="hideAddPositionModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2.5 rounded transition">
+                        Abbrechen
+                    </button>
+                    <button type="submit"
+                            class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2.5 rounded transition">
+                        Position hinzufuegen
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Modal: Neuen API-Key erstellen -->
@@ -326,46 +338,85 @@
         </div>
     </div>
 
-    <!-- Modal: Einstellungen (Default-Abschlaege) -->
-    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 class="text-lg font-semibold mb-2">Einstellungen</h3>
-            <p class="text-gray-400 text-sm mb-4">Default-Abschlaege pro Edelmetall (in %). Diese werden verwendet, wenn eine Position keinen spezifischen Abschlag hat.</p>
-
-            <div class="space-y-3 mb-4">
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Gold - Default-Abschlag %</label>
-                    <input type="number" id="settings-gold" step="0.1" min="0" max="100" placeholder="0"
-                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+    <!-- Modal: Einstellungen (mit Tabs) -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-800 rounded-lg max-w-lg w-full mx-4 shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+            <!-- Header mit Tabs -->
+            <div class="border-b border-gray-700">
+                <div class="flex justify-between items-center px-6 pt-4 pb-0">
+                    <h3 class="text-lg font-semibold">Einstellungen</h3>
+                    <button onclick="hideSettingsModal()" class="text-gray-400 hover:text-white transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Silber - Default-Abschlag %</label>
-                    <input type="number" id="settings-silver" step="0.1" min="0" max="100" placeholder="0"
-                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Platin - Default-Abschlag %</label>
-                    <input type="number" id="settings-platinum" step="0.1" min="0" max="100" placeholder="0"
-                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Palladium - Default-Abschlag %</label>
-                    <input type="number" id="settings-palladium" step="0.1" min="0" max="100" placeholder="0"
-                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                <div class="flex px-6 mt-4">
+                    <button onclick="showSettingsTab('discounts')" id="tab-discounts" class="px-4 py-2 text-sm font-medium border-b-2 border-yellow-500 text-yellow-500 transition">
+                        Abschlaege
+                    </button>
+                    <button onclick="showSettingsTab('apikeys')" id="tab-apikeys" class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 transition">
+                        API-Keys
+                    </button>
                 </div>
             </div>
 
-            <p class="text-xs text-gray-500 mb-4">
-                Die Abschlaege werden zusaetzlich zum allgemeinen Ankaufsfaktor (95% vom Spot) angewendet.
-            </p>
+            <!-- Tab Content -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <!-- Discounts Tab -->
+                <div id="settings-discounts" class="space-y-4">
+                    <p class="text-gray-400 text-sm">Default-Abschlaege pro Edelmetall (in %). Diese werden verwendet, wenn eine Position keinen spezifischen Abschlag hat.</p>
 
-            <div class="flex gap-3">
-                <button onclick="hideSettingsModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 rounded transition">
-                    Abbrechen
-                </button>
-                <button onclick="saveSettings()" class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
-                    Speichern
-                </button>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Gold</label>
+                            <input type="number" id="settings-gold" step="0.1" min="0" max="100" placeholder="0"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Silber</label>
+                            <input type="number" id="settings-silver" step="0.1" min="0" max="100" placeholder="0"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Platin</label>
+                            <input type="number" id="settings-platinum" step="0.1" min="0" max="100" placeholder="0"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Palladium</label>
+                            <input type="number" id="settings-palladium" step="0.1" min="0" max="100" placeholder="0"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-500">
+                        Die Abschlaege werden zusaetzlich zum allgemeinen Ankaufsfaktor (95% vom Spot) angewendet.
+                    </p>
+
+                    <button onclick="saveSettings()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2.5 rounded transition">
+                        Speichern
+                    </button>
+                </div>
+
+                <!-- API Keys Tab -->
+                <div id="settings-apikeys" class="hidden space-y-4">
+                    <div class="flex justify-between items-center">
+                        <p class="text-gray-400 text-sm">API-Keys fuer programmatischen Zugriff</p>
+                        <button onclick="showCreateKeyModal()" class="bg-yellow-600 hover:bg-yellow-500 text-black text-sm font-bold px-3 py-1.5 rounded transition">
+                            + Neuer Key
+                        </button>
+                    </div>
+
+                    <div id="api-keys-list" class="space-y-2">
+                        <p class="text-gray-500 text-sm">Lade API-Keys...</p>
+                    </div>
+
+                    <div class="bg-gray-700/50 rounded p-3 mt-4">
+                        <p class="text-xs text-gray-400 mb-2">Verwendung:</p>
+                        <code class="text-xs text-green-400 break-all">curl -H "X-API-Key: mt_..." URL</code>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -711,6 +762,7 @@
                     document.getElementById('weight-unit').value = 'oz';
                     document.getElementById('quantity').value = '1';
                     document.getElementById('weight').value = '1';
+                    hideAddPositionModal();
                     loadAll();
                 } else {
                     const err = await res.json();
@@ -854,8 +906,20 @@
 
         // === SETTINGS ===
 
+        // === ADD POSITION MODAL ===
+        function showAddPositionModal() {
+            document.getElementById('add-position-modal').classList.remove('hidden');
+            document.getElementById('metal-type').focus();
+        }
+
+        function hideAddPositionModal() {
+            document.getElementById('add-position-modal').classList.add('hidden');
+        }
+
+        // === SETTINGS MODAL ===
         async function showSettingsModal() {
             toggleUserMenu(); // Menu schliessen
+            showSettingsTab('discounts'); // Default Tab
             try {
                 const res = await apiFetch(API + '/api/settings');
                 if (!res) return;
@@ -874,6 +938,28 @@
 
         function hideSettingsModal() {
             document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function showSettingsTab(tab) {
+            // Tabs
+            document.getElementById('tab-discounts').classList.toggle('border-yellow-500', tab === 'discounts');
+            document.getElementById('tab-discounts').classList.toggle('text-yellow-500', tab === 'discounts');
+            document.getElementById('tab-discounts').classList.toggle('border-transparent', tab !== 'discounts');
+            document.getElementById('tab-discounts').classList.toggle('text-gray-400', tab !== 'discounts');
+
+            document.getElementById('tab-apikeys').classList.toggle('border-yellow-500', tab === 'apikeys');
+            document.getElementById('tab-apikeys').classList.toggle('text-yellow-500', tab === 'apikeys');
+            document.getElementById('tab-apikeys').classList.toggle('border-transparent', tab !== 'apikeys');
+            document.getElementById('tab-apikeys').classList.toggle('text-gray-400', tab !== 'apikeys');
+
+            // Content
+            document.getElementById('settings-discounts').classList.toggle('hidden', tab !== 'discounts');
+            document.getElementById('settings-apikeys').classList.toggle('hidden', tab !== 'apikeys');
+
+            // Load API keys when switching to that tab
+            if (tab === 'apikeys') {
+                loadApiKeys();
+            }
         }
 
         async function saveSettings() {
@@ -912,12 +998,21 @@
             loadSummary();
             loadPositions();
             loadHistory();
-            loadApiKeys();
         }
 
         // Event Listeners
         document.getElementById('add-form').addEventListener('submit', addPosition);
         document.getElementById('chart-period').addEventListener('change', loadHistory);
+
+        // Close modals with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideAddPositionModal();
+                hideSettingsModal();
+                hideCreateKeyModal();
+                hideShowKeyModal();
+            }
+        });
 
         // Init - Check Auth first
         (function init() {
