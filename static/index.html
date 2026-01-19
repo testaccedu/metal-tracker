@@ -18,6 +18,38 @@
         select, input { color: #fff; }
         select option { background: #1f2937; color: #fff; }
 
+        /* Date-Input Styling - OS-Standard nutzen, aber konsistentes Aussehen */
+        input[type="date"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            min-height: 38px;
+            cursor: pointer;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+            opacity: 0.6;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
+
+        /* Modal-Animationen */
+        .modal-content {
+            animation: modalSlideIn 0.2s ease-out;
+        }
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
         /* Mobile Card Layout für Positionen */
         @media (max-width: 767px) {
             .positions-table-desktop { display: none; }
@@ -69,11 +101,11 @@
             </div>
         </header>
 
-        <!-- Upgrade Banner (nur fuer Free-User) -->
+        <!-- Upgrade Banner (nur für Free-User) -->
         <div id="upgrade-banner" class="hidden mb-4 bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 border border-yellow-600/30 rounded-lg p-4 flex justify-between items-center">
             <div>
                 <p class="text-yellow-500 font-medium">Position-Limit fast erreicht!</p>
-                <p class="text-sm text-gray-400">Upgrade auf Premium fuer unbegrenzte Positionen.</p>
+                <p class="text-sm text-gray-400">Upgrade auf Premium für unbegrenzte Positionen.</p>
             </div>
             <button class="hidden bg-yellow-600 hover:bg-yellow-500 text-black font-bold px-4 py-2 rounded text-sm transition">
                 Upgrade
@@ -198,35 +230,35 @@
 
         <!-- Footer -->
         <footer class="mt-6 pb-16 text-center text-gray-600 text-xs">
-            <p>Preise von GOLD.DE - ohne Gewaehr</p>
+            <p>Preise von GOLD.DE - ohne Gewähr</p>
         </footer>
     </div>
 
     <!-- Floating Action Button (FAB) -->
     <button onclick="showAddPositionModal()"
             class="fixed bottom-6 right-6 w-14 h-14 bg-yellow-600 hover:bg-yellow-500 text-black rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40 hover:scale-110"
-            title="Neue Position hinzufuegen">
+            title="Neue Position hinzufügen">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
         </svg>
     </button>
 
     <!-- Modal: Neue Position -->
-    <div id="add-position-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4">
+    <div id="add-position-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="modal-content bg-gray-800 rounded-xl p-5 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-700/50">
+            <div class="flex justify-between items-center mb-5 pb-3 border-b border-gray-700/50">
                 <h3 class="text-lg font-semibold">Neue Position</h3>
-                <button onclick="hideAddPositionModal()" class="text-gray-400 hover:text-white transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onclick="hideAddPositionModal()" class="text-gray-400 hover:text-white transition p-1 hover:bg-gray-700 rounded">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
             <form id="add-form" class="space-y-4">
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">Metall</label>
-                        <select id="metal-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        <label class="block text-xs text-gray-400 mb-1.5">Metall</label>
+                        <select id="metal-type" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
                             <option value="gold">Gold</option>
                             <option value="silver">Silber</option>
                             <option value="platinum">Platin</option>
@@ -234,9 +266,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">Art</label>
-                        <select id="product-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                            <option value="coin">Muenze</option>
+                        <label class="block text-xs text-gray-400 mb-1.5">Art</label>
+                        <select id="product-type" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
+                            <option value="coin">Münze</option>
                             <option value="bar">Barren</option>
                             <option value="round">Medaille</option>
                             <option value="granulate">Granulat</option>
@@ -245,22 +277,22 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">Beschreibung</label>
-                    <input type="text" id="description" placeholder="z.B. Kruegerrand 1oz"
-                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                    <label class="block text-xs text-gray-400 mb-1.5">Beschreibung</label>
+                    <input type="text" id="description" placeholder="z.B. Krügerrand 1oz"
+                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none placeholder-gray-500">
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">Anzahl</label>
+                        <label class="block text-xs text-gray-400 mb-1.5">Anzahl</label>
                         <input type="number" id="quantity" value="1" min="1" step="1" required
-                               class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">Gewicht pro Stueck</label>
+                        <label class="block text-xs text-gray-400 mb-1.5">Gewicht pro Stück</label>
                         <div class="flex">
                             <input type="number" id="weight" step="0.001" min="0" value="1" required
-                                   class="w-full bg-gray-700 rounded-l px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                            <select id="weight-unit" class="bg-gray-600 rounded-r px-2 py-2 text-sm focus:outline-none">
+                                   class="w-full bg-gray-700 border border-gray-600 border-r-0 rounded-l-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
+                            <select id="weight-unit" class="bg-gray-600 border border-gray-600 rounded-r-lg px-2 py-2.5 text-sm focus:outline-none min-w-[52px]">
                                 <option value="oz">oz</option>
                                 <option value="g">g</option>
                                 <option value="kg">kg</option>
@@ -268,31 +300,31 @@
                         </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">Kaufpreis gesamt (EUR)</label>
-                        <input type="number" id="purchase-price" step="0.01" min="0" required placeholder="0.00"
-                               class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                        <label class="block text-xs text-gray-400 mb-1.5">Kaufpreis (EUR)</label>
+                        <input type="number" id="purchase-price" step="0.01" min="0" required placeholder="0,00"
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none placeholder-gray-500">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">Kaufdatum</label>
+                        <label class="block text-xs text-gray-400 mb-1.5">Kaufdatum</label>
                         <input type="date" id="purchase-date"
-                               class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">Abschlag % <span class="text-gray-500">(optional)</span></label>
-                    <input type="number" id="discount-percent" step="0.1" min="0" max="100" placeholder="Leer = Default-Wert"
-                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none"
-                           title="Optional: Abschlag in %. Wenn leer, wird der Default-Wert aus den Einstellungen verwendet.">
+                    <label class="block text-xs text-gray-400 mb-1.5">Abschlag % <span class="text-gray-500">(optional)</span></label>
+                    <input type="number" id="discount-percent" step="0.1" min="0" max="100" placeholder="Standard verwenden"
+                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none placeholder-gray-500"
+                           title="Optional: Abschlag in %. Wenn leer, wird der Standard aus den Einstellungen verwendet.">
                 </div>
-                <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="hideAddPositionModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2.5 rounded transition">
+                <div class="flex gap-3 pt-3">
+                    <button type="button" onclick="hideAddPositionModal()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2.5 rounded-lg transition border border-gray-600">
                         Abbrechen
                     </button>
                     <button type="submit"
-                            class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2.5 rounded transition">
-                        Position hinzufuegen
+                            class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2.5 rounded-lg transition">
+                        Hinzufügen
                     </button>
                 </div>
             </form>
@@ -353,7 +385,7 @@
                 </div>
                 <div class="flex px-6 mt-4">
                     <button onclick="showSettingsTab('discounts')" id="tab-discounts" class="px-4 py-2 text-sm font-medium border-b-2 border-yellow-500 text-yellow-500 transition">
-                        Abschlaege
+                        Abschläge
                     </button>
                     <button onclick="showSettingsTab('apikeys')" id="tab-apikeys" class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 transition">
                         API-Keys
@@ -365,7 +397,7 @@
             <div class="flex-1 overflow-y-auto p-6">
                 <!-- Discounts Tab -->
                 <div id="settings-discounts" class="space-y-4">
-                    <p class="text-gray-400 text-sm">Default-Abschlaege pro Edelmetall (in %). Diese werden verwendet, wenn eine Position keinen spezifischen Abschlag hat.</p>
+                    <p class="text-gray-400 text-sm">Standard-Abschläge pro Edelmetall (in %). Diese werden verwendet, wenn eine Position keinen eigenen Abschlag hat.</p>
 
                     <div class="space-y-3">
                         <div>
@@ -391,7 +423,7 @@
                     </div>
 
                     <p class="text-xs text-gray-500">
-                        Die Abschlaege werden zusaetzlich zum allgemeinen Ankaufsfaktor (95% vom Spot) angewendet.
+                        Die Abschläge werden zusätzlich zum allgemeinen Ankaufsfaktor (95% vom Spot) angewendet.
                     </p>
 
                     <button onclick="saveSettings()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2.5 rounded transition">
@@ -402,7 +434,7 @@
                 <!-- API Keys Tab -->
                 <div id="settings-apikeys" class="hidden space-y-4">
                     <div class="flex justify-between items-center">
-                        <p class="text-gray-400 text-sm">API-Keys fuer programmatischen Zugriff</p>
+                        <p class="text-gray-400 text-sm">API-Keys für programmatischen Zugriff</p>
                         <button onclick="showCreateKeyModal()" class="bg-yellow-600 hover:bg-yellow-500 text-black text-sm font-bold px-3 py-1.5 rounded transition">
                             + Neuer Key
                         </button>
@@ -540,7 +572,7 @@
 
         const metalNames = { gold: 'Gold', silver: 'Silber', platinum: 'Platin', palladium: 'Palladium' };
         const metalColors = { gold: 'gold-text', silver: 'silver-text', platinum: 'platinum-text', palladium: 'palladium-text' };
-        const productNames = { coin: 'Muenze', bar: 'Barren', round: 'Medaille', granulate: 'Granulat', jewelry: 'Schmuck' };
+        const productNames = { coin: 'Münze', bar: 'Barren', round: 'Medaille', granulate: 'Granulat', jewelry: 'Schmuck' };
 
         // Daten laden
         async function loadPrices() {
@@ -615,7 +647,7 @@
                             <span class="text-xs opacity-75">${formatPercent(p.profit_loss_percent)}</span>
                         </td>
                         <td class="py-3 px-1 text-center">
-                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition" title="Loeschen">
+                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition" title="Löschen">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
@@ -633,7 +665,7 @@
                                 <p class="text-gray-400 text-xs">${escapeHtml(productNames[p.product_type] || p.product_type)}${p.description ? ' · ' + escapeHtml(p.description) : ''}</p>
                                 ${p.purchase_date ? `<p class="text-gray-500 text-xs mt-1">Gekauft: ${formatDate(p.purchase_date)}</p>` : ''}
                             </div>
-                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition p-1" title="Loeschen">
+                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition p-1" title="Löschen">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
@@ -775,12 +807,12 @@
                 }
             } catch (e) {
                 console.error('Fehler:', e);
-                alert('Fehler beim Hinzufuegen');
+                alert('Fehler beim Hinzufügen');
             }
         }
 
         async function deletePosition(id) {
-            if (!confirm('Position wirklich loeschen?')) return;
+            if (!confirm('Position wirklich löschen?')) return;
 
             try {
                 const res = await apiFetch(API + '/api/positions/' + id, { method: 'DELETE' });
@@ -879,7 +911,7 @@
                         <div class="flex items-center gap-3 text-sm text-gray-400">
                             <span title="Erstellt">${formatDate(k.created_at)}</span>
                             ${k.last_used_at ? '<span class="text-green-500" title="Zuletzt verwendet">Aktiv</span>' : ''}
-                            <button onclick="deleteApiKey(${k.id})" class="text-gray-500 hover:text-red-400 transition" title="Loeschen">
+                            <button onclick="deleteApiKey(${k.id})" class="text-gray-500 hover:text-red-400 transition" title="Löschen">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
@@ -893,7 +925,7 @@
         }
 
         async function deleteApiKey(id) {
-            if (!confirm('API-Key wirklich loeschen?')) return;
+            if (!confirm('API-Key wirklich löschen?')) return;
 
             try {
                 const res = await apiFetch(API + '/api/auth/api-keys/' + id, { method: 'DELETE' });
@@ -909,7 +941,8 @@
         // === ADD POSITION MODAL ===
         function showAddPositionModal() {
             document.getElementById('add-position-modal').classList.remove('hidden');
-            document.getElementById('metal-type').focus();
+            // Kein auto-focus auf Select-Elemente - verhindert ungewolltes Öffnen des Dropdowns
+            document.getElementById('description').focus();
         }
 
         function hideAddPositionModal() {
