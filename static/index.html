@@ -248,6 +248,7 @@
                             <th class="text-left py-2 px-1">Beschreibung</th>
                             <th class="text-right py-2 px-1">Anz.</th>
                             <th class="text-right py-2 px-1">Gewicht</th>
+                            <th class="text-right py-2 px-1">Kaufdatum</th>
                             <th class="text-right py-2 px-1">Kaufpreis</th>
                             <th class="text-right py-2 px-1">Aktuell</th>
                             <th class="text-right py-2 px-1">+/-</th>
@@ -255,7 +256,7 @@
                         </tr>
                     </thead>
                     <tbody id="positions-table">
-                        <tr><td colspan="9" class="text-center py-8 text-gray-500">Lade Positionen...</td></tr>
+                        <tr><td colspan="10" class="text-center py-8 text-gray-500">Lade Positionen...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -542,7 +543,7 @@
                 document.getElementById('positions-count').textContent = positions.length + ' Position' + (positions.length !== 1 ? 'en' : '');
 
                 if (positions.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">Keine Positionen vorhanden</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">Keine Positionen vorhanden</td></tr>';
                     cardsContainer.innerHTML = '<p class="text-center py-8 text-gray-500">Keine Positionen vorhanden</p>';
                     return;
                 }
@@ -555,6 +556,7 @@
                         <td class="py-3 px-1">${escapeHtml(p.description) || '-'}</td>
                         <td class="py-3 px-1 text-right">${parseInt(p.quantity)}x</td>
                         <td class="py-3 px-1 text-right font-mono text-xs">${p.quantity > 1 ? parseInt(p.quantity) + 'x ' : ''}${formatWeight(p.weight_per_unit, p.weight_unit)}</td>
+                        <td class="py-3 px-1 text-right text-xs text-gray-400">${p.purchase_date ? formatDate(p.purchase_date) : '-'}</td>
                         <td class="py-3 px-1 text-right">${formatEUR(p.purchase_price_eur)}</td>
                         <td class="py-3 px-1 text-right font-medium">${formatEUR(p.current_value_eur)}</td>
                         <td class="py-3 px-1 text-right ${p.profit_loss_eur >= 0 ? 'positive' : 'negative'}">
@@ -578,6 +580,7 @@
                             <div>
                                 <h3 class="${metalColors[p.metal_type] || ''} font-medium text-base">${escapeHtml(metalNames[p.metal_type] || p.metal_type)}</h3>
                                 <p class="text-gray-400 text-xs">${escapeHtml(productNames[p.product_type] || p.product_type)}${p.description ? ' · ' + escapeHtml(p.description) : ''}</p>
+                                ${p.purchase_date ? `<p class="text-gray-500 text-xs mt-1">Gekauft: ${formatDate(p.purchase_date)}</p>` : ''}
                             </div>
                             <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition p-1" title="Loeschen">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
