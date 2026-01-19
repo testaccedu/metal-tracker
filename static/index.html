@@ -425,8 +425,8 @@
                 for (const [metal, info] of Object.entries(data.prices)) {
                     const gEl = document.getElementById('price-' + metal + '-g');
                     const ozEl = document.getElementById('price-' + metal + '-oz');
-                    if (gEl) gEl.textContent = formatEUR(info.ankauf_per_gram_eur) + '/g';
-                    if (ozEl) ozEl.textContent = formatEUR(info.ankauf_per_oz_eur) + '/oz';
+                    if (gEl) gEl.textContent = formatEUR(info.spot_per_gram_eur) + '/g';
+                    if (ozEl) ozEl.textContent = formatEUR(info.spot_per_oz_eur) + '/oz';
                 }
 
                 document.getElementById('last-update').textContent =
