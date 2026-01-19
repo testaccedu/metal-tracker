@@ -17,35 +17,50 @@
         .silver-bg { background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%); }
         select, input { color: #fff; }
         select option { background: #1f2937; color: #fff; }
+
+        /* Mobile Card Layout für Positionen */
+        @media (max-width: 767px) {
+            .positions-table-desktop { display: none; }
+            .positions-cards-mobile { display: block; }
+        }
+        @media (min-width: 768px) {
+            .positions-table-desktop { display: block; }
+            .positions-cards-mobile { display: none; }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-6 max-w-5xl">
 
         <!-- Header -->
-        <header class="mb-6 flex justify-between items-center">
+        <header class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
                 <h1 class="text-2xl font-bold gold-text">Metal Tracker</h1>
                 <p class="text-gray-400 text-sm">Dein Edelmetall-Portfolio</p>
             </div>
-            <div class="flex items-center gap-4">
-                <div class="text-right text-sm text-gray-500">
+            <div class="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                <div class="text-right text-xs sm:text-sm text-gray-500 hidden sm:block">
                     <span id="last-update">-</span>
                 </div>
                 <!-- User Menu -->
-                <div class="relative" id="user-menu">
-                    <button onclick="toggleUserMenu()" class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition">
-                        <span id="user-email" class="text-sm text-gray-300 max-w-[120px] truncate">-</span>
-                        <span id="tier-badge" class="text-xs px-2 py-0.5 rounded bg-gray-600 text-gray-300">free</span>
-                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="relative flex-1 sm:flex-initial" id="user-menu">
+                    <button onclick="toggleUserMenu()" class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-2 sm:px-3 py-2 rounded-lg transition w-full sm:w-auto justify-between">
+                        <span id="user-email" class="text-xs sm:text-sm text-gray-300 truncate max-w-[100px] sm:max-w-[150px]">-</span>
+                        <span id="tier-badge" class="text-xs px-2 py-0.5 rounded bg-gray-600 text-gray-300 whitespace-nowrap">free</span>
+                        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
                     <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-50">
                         <div class="px-4 py-3 border-b border-gray-700">
+                            <p class="text-xs text-gray-500">E-Mail</p>
+                            <p class="text-sm break-all mb-2" id="user-email-full">-</p>
                             <p class="text-xs text-gray-500">Positionen</p>
                             <p class="text-sm"><span id="positions-used">0</span> / <span id="positions-limit">10</span></p>
                         </div>
+                        <button onclick="showSettingsModal()" class="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 transition">
+                            Einstellungen
+                        </button>
                         <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-gray-700 rounded-b-lg transition">
                             Abmelden
                         </button>
@@ -146,9 +161,9 @@
         </div>
 
         <!-- Neue Position -->
-        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 mb-6">
             <h2 class="font-semibold mb-4">Neue Position</h2>
-            <form id="add-form" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <form id="add-form" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">Metall</label>
                     <select id="metal-type" class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
@@ -200,10 +215,17 @@
                     <input type="date" id="purchase-date"
                            class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
                 </div>
-                <div class="flex items-end">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Abschlag %</label>
+                    <input type="number" id="discount-percent" step="0.1" min="0" max="100" placeholder="Optional"
+                           class="w-full bg-gray-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none"
+                           title="Optional: Abschlag in %. Wenn leer, wird der Default-Wert verwendet.">
+                </div>
+                <div class="flex items-end sm:col-span-2 lg:col-span-1">
                     <button type="submit"
                             class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 px-4 rounded text-sm transition">
-                        +
+                        <span class="sm:hidden">Position hinzufügen</span>
+                        <span class="hidden sm:inline">+</span>
                     </button>
                 </div>
             </form>
@@ -215,7 +237,9 @@
                 <h2 class="font-semibold">Positionen</h2>
                 <span id="positions-count" class="text-gray-400 text-sm">0 Positionen</span>
             </div>
-            <div class="overflow-x-auto">
+
+            <!-- Desktop: Tabelle -->
+            <div class="overflow-x-auto positions-table-desktop">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
@@ -234,6 +258,11 @@
                         <tr><td colspan="9" class="text-center py-8 text-gray-500">Lade Positionen...</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Mobile: Cards -->
+            <div id="positions-cards" class="positions-cards-mobile space-y-3">
+                <p class="text-center py-8 text-gray-500">Lade Positionen...</p>
             </div>
         </div>
 
@@ -293,6 +322,50 @@
             <button onclick="hideShowKeyModal()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
                 Verstanden
             </button>
+        </div>
+    </div>
+
+    <!-- Modal: Einstellungen (Default-Abschlaege) -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 class="text-lg font-semibold mb-2">Einstellungen</h3>
+            <p class="text-gray-400 text-sm mb-4">Default-Abschlaege pro Edelmetall (in %). Diese werden verwendet, wenn eine Position keinen spezifischen Abschlag hat.</p>
+
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Gold - Default-Abschlag %</label>
+                    <input type="number" id="settings-gold" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Silber - Default-Abschlag %</label>
+                    <input type="number" id="settings-silver" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Platin - Default-Abschlag %</label>
+                    <input type="number" id="settings-platinum" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Palladium - Default-Abschlag %</label>
+                    <input type="number" id="settings-palladium" step="0.1" min="0" max="100" placeholder="0"
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                </div>
+            </div>
+
+            <p class="text-xs text-gray-500 mb-4">
+                Die Abschlaege werden zusaetzlich zum allgemeinen Ankaufsfaktor (95% vom Spot) angewendet.
+            </p>
+
+            <div class="flex gap-3">
+                <button onclick="hideSettingsModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 rounded transition">
+                    Abbrechen
+                </button>
+                <button onclick="saveSettings()" class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
+                    Speichern
+                </button>
+            </div>
         </div>
     </div>
 
@@ -361,6 +434,7 @@
 
                 // Update UI
                 document.getElementById('user-email').textContent = currentUser.email;
+                document.getElementById('user-email-full').textContent = currentUser.email;
                 document.getElementById('tier-badge').textContent = currentUser.tier;
 
                 if (currentUser.tier === 'premium') {
@@ -464,13 +538,16 @@
                 const positions = await res.json();
 
                 const tbody = document.getElementById('positions-table');
+                const cardsContainer = document.getElementById('positions-cards');
                 document.getElementById('positions-count').textContent = positions.length + ' Position' + (positions.length !== 1 ? 'en' : '');
 
                 if (positions.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">Keine Positionen vorhanden</td></tr>';
+                    cardsContainer.innerHTML = '<p class="text-center py-8 text-gray-500">Keine Positionen vorhanden</p>';
                     return;
                 }
 
+                // Desktop: Tabelle
                 tbody.innerHTML = positions.map(p => `
                     <tr class="border-b border-gray-700/50 hover:bg-gray-700/30">
                         <td class="py-3 px-1 ${metalColors[p.metal_type] || ''} font-medium">${escapeHtml(metalNames[p.metal_type] || p.metal_type)}</td>
@@ -492,6 +569,44 @@
                             </button>
                         </td>
                     </tr>
+                `).join('');
+
+                // Mobile: Cards
+                cardsContainer.innerHTML = positions.map(p => `
+                    <div class="bg-gray-700/30 rounded-lg p-3 border-l-4 ${p.profit_loss_eur >= 0 ? 'border-green-500' : 'border-red-500'}">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h3 class="${metalColors[p.metal_type] || ''} font-medium text-base">${escapeHtml(metalNames[p.metal_type] || p.metal_type)}</h3>
+                                <p class="text-gray-400 text-xs">${escapeHtml(productNames[p.product_type] || p.product_type)}${p.description ? ' · ' + escapeHtml(p.description) : ''}</p>
+                            </div>
+                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition p-1" title="Loeschen">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <p class="text-gray-500 text-xs">Menge</p>
+                                <p>${parseInt(p.quantity)}x ${formatWeight(p.weight_per_unit, p.weight_unit)}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-gray-500 text-xs">Kaufpreis</p>
+                                <p>${formatEUR(p.purchase_price_eur)}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 text-xs">Aktueller Wert</p>
+                                <p class="font-medium">${formatEUR(p.current_value_eur)}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-gray-500 text-xs">Gewinn/Verlust</p>
+                                <p class="${p.profit_loss_eur >= 0 ? 'positive' : 'negative'} font-medium">
+                                    ${(p.profit_loss_eur >= 0 ? '+' : '') + formatEUR(p.profit_loss_eur)}
+                                    <span class="text-xs opacity-75">(${formatPercent(p.profit_loss_percent)})</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 `).join('');
             } catch (e) {
                 console.error('Fehler beim Laden der Positionen:', e);
@@ -566,6 +681,8 @@
         async function addPosition(e) {
             e.preventDefault();
 
+            const discountValue = document.getElementById('discount-percent').value;
+
             const data = {
                 metal_type: document.getElementById('metal-type').value,
                 product_type: document.getElementById('product-type').value,
@@ -574,7 +691,8 @@
                 weight_per_unit: parseFloat(document.getElementById('weight').value),
                 weight_unit: document.getElementById('weight-unit').value,
                 purchase_price_eur: parseFloat(document.getElementById('purchase-price').value),
-                purchase_date: document.getElementById('purchase-date').value || null
+                purchase_date: document.getElementById('purchase-date').value || null,
+                discount_percent: discountValue ? parseFloat(discountValue) : null
             };
 
             try {
@@ -728,6 +846,60 @@
                 if (res.ok) loadApiKeys();
             } catch (e) {
                 console.error('Fehler:', e);
+            }
+        }
+
+        // === SETTINGS ===
+
+        async function showSettingsModal() {
+            toggleUserMenu(); // Menu schliessen
+            try {
+                const res = await apiFetch(API + '/api/settings');
+                if (!res) return;
+                if (res.ok) {
+                    const settings = await res.json();
+                    document.getElementById('settings-gold').value = settings.default_discount_gold || 0;
+                    document.getElementById('settings-silver').value = settings.default_discount_silver || 0;
+                    document.getElementById('settings-platinum').value = settings.default_discount_platinum || 0;
+                    document.getElementById('settings-palladium').value = settings.default_discount_palladium || 0;
+                    document.getElementById('settings-modal').classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error('Fehler beim Laden der Einstellungen:', e);
+            }
+        }
+
+        function hideSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        async function saveSettings() {
+            const data = {
+                default_discount_gold: parseFloat(document.getElementById('settings-gold').value) || 0,
+                default_discount_silver: parseFloat(document.getElementById('settings-silver').value) || 0,
+                default_discount_platinum: parseFloat(document.getElementById('settings-platinum').value) || 0,
+                default_discount_palladium: parseFloat(document.getElementById('settings-palladium').value) || 0
+            };
+
+            try {
+                const res = await apiFetch(API + '/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!res) return;
+                if (res.ok) {
+                    hideSettingsModal();
+                    // Portfolio neu laden, da sich Werte geaendert haben koennten
+                    loadAll();
+                } else {
+                    const err = await res.json();
+                    alert('Fehler: ' + (err.detail || 'Unbekannt'));
+                }
+            } catch (e) {
+                console.error('Fehler:', e);
+                alert('Fehler beim Speichern');
             }
         }
 

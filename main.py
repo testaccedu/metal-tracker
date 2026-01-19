@@ -178,7 +178,8 @@ async def create_position(
         weight_unit=position.weight_unit.value,
         weight_grams=total_weight_grams,
         purchase_price_eur=position.purchase_price_eur,
-        purchase_date=position.purchase_date
+        purchase_date=position.purchase_date,
+        discount_percent=position.discount_percent
     )
     db.add(db_position)
     db.commit()
@@ -187,7 +188,7 @@ async def create_position(
     # Snapshot aktualisieren
     await update_daily_snapshot(db, user)
 
-    return await enrich_position(db_position)
+    return await enrich_position(db, db_position, user)
 
 
 @app.get("/api/positions", response_model=list[schemas.Position], tags=["Positionen"])
@@ -208,7 +209,7 @@ async def get_positions(
         query = query.filter(models.Position.product_type == product_type.value)
 
     positions = query.order_by(models.Position.created_at.desc()).all()
-    return [await enrich_position(p) for p in positions]
+    return [await enrich_position(db, p, user) for p in positions]
 
 
 @app.get("/api/positions/{position_id}", response_model=schemas.Position, tags=["Positionen"])
@@ -228,7 +229,7 @@ async def get_position(
     if not position:
         raise HTTPException(status_code=404, detail="Position nicht gefunden")
 
-    return await enrich_position(position)
+    return await enrich_position(db, position, user)
 
 
 @app.put("/api/positions/{position_id}", response_model=schemas.Position, tags=["Positionen"])
@@ -277,7 +278,7 @@ async def update_position(
     # Snapshot aktualisieren
     await update_daily_snapshot(db, user)
 
-    return await enrich_position(position)
+    return await enrich_position(db, position, user)
 
 
 @app.delete("/api/positions/{position_id}", tags=["Positionen"])
@@ -304,6 +305,45 @@ async def delete_position(
     await update_daily_snapshot(db, user)
 
     return {"message": "Position geloescht", "id": position_id}
+
+
+# === USER SETTINGS ===
+
+@app.get("/api/settings", response_model=schemas.UserSettingsResponse, tags=["Einstellungen"])
+@limiter.limit("30/minute")
+async def get_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(auth_module.get_current_user)
+):
+    """User-Einstellungen abrufen (Default-Abschlaege pro Edelmetall)"""
+    settings = get_user_settings(db, user)
+    return settings
+
+
+@app.put("/api/settings", response_model=schemas.UserSettingsResponse, tags=["Einstellungen"])
+@limiter.limit("20/minute")
+async def update_settings(
+    request: Request,
+    settings_update: schemas.UserSettingsUpdate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(auth_module.get_current_user)
+):
+    """User-Einstellungen aktualisieren (Default-Abschlaege pro Edelmetall)"""
+    settings = get_user_settings(db, user)
+
+    update_data = settings_update.model_dump(exclude_unset=True)
+
+    for field, value in update_data.items():
+        setattr(settings, field, value)
+
+    db.commit()
+    db.refresh(settings)
+
+    # Snapshots neu berechnen, da sich Discounts geaendert haben koennten
+    await update_daily_snapshot(db, user)
+
+    return settings
 
 
 # === PORTFOLIO SUMMARY ===
@@ -333,11 +373,16 @@ async def get_portfolio_summary(
     total_current = 0.0
     by_metal: dict = {}
 
+    # User-Settings einmal laden
+    user_settings = get_user_settings(db, user)
+
     for position in positions:
         metal = position.metal_type
+        effective_discount = get_effective_discount(position, user_settings)
         current_value = await price_service.calculate_current_value(
             position.metal_type,
-            position.weight_grams
+            position.weight_grams,
+            effective_discount
         )
 
         total_purchase += position.purchase_price_eur
@@ -445,11 +490,59 @@ async def create_snapshot(
 
 # === HELPER FUNCTIONS ===
 
-async def enrich_position(position: models.Position) -> dict:
+def get_user_settings(db: Session, user: models.User) -> models.UserSettings:
+    """Holt oder erstellt die UserSettings fuer einen User"""
+    settings = db.query(models.UserSettings).filter(
+        models.UserSettings.user_id == user.id
+    ).first()
+
+    if not settings:
+        # Settings erstellen mit Default-Werten (0% Abschlag)
+        settings = models.UserSettings(
+            user_id=user.id,
+            default_discount_gold=0.0,
+            default_discount_silver=0.0,
+            default_discount_platinum=0.0,
+            default_discount_palladium=0.0
+        )
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+
+    return settings
+
+
+def get_effective_discount(position: models.Position, user_settings: models.UserSettings) -> float:
+    """
+    Ermittelt den effektiven Discount fuer eine Position
+
+    Wenn Position einen eigenen Discount hat, wird dieser verwendet.
+    Sonst wird der Default-Discount aus den UserSettings fuer das Metall verwendet.
+    """
+    if position.discount_percent is not None:
+        return position.discount_percent
+
+    # Default-Discount je nach Metall
+    discount_map = {
+        "gold": user_settings.default_discount_gold,
+        "silver": user_settings.default_discount_silver,
+        "platinum": user_settings.default_discount_platinum,
+        "palladium": user_settings.default_discount_palladium
+    }
+
+    return discount_map.get(position.metal_type, 0.0)
+
+
+async def enrich_position(db: Session, position: models.Position, user: models.User) -> dict:
     """Reichert eine Position mit aktuellem Wert und Gewinn/Verlust an"""
+    # User-Settings laden um Default-Discount zu ermitteln
+    user_settings = get_user_settings(db, user)
+    effective_discount = get_effective_discount(position, user_settings)
+
     current_value = await price_service.calculate_current_value(
         position.metal_type,
-        position.weight_grams
+        position.weight_grams,
+        effective_discount
     )
     profit_loss = current_value - position.purchase_price_eur
     profit_loss_percent = (profit_loss / position.purchase_price_eur * 100) if position.purchase_price_eur > 0 else 0
@@ -465,6 +558,7 @@ async def enrich_position(position: models.Position) -> dict:
         "weight_grams": round(position.weight_grams, 4),
         "purchase_price_eur": position.purchase_price_eur,
         "purchase_date": position.purchase_date,
+        "discount_percent": position.discount_percent,
         "created_at": position.created_at,
         "updated_at": position.updated_at,
         "current_value_eur": round(current_value, 2),
@@ -487,8 +581,16 @@ async def update_daily_snapshot(db: Session, user: models.User):
     total_current = 0.0
     weights = {"gold": 0, "silver": 0, "platinum": 0, "palladium": 0}
 
+    # User-Settings einmal laden
+    user_settings = get_user_settings(db, user)
+
     for p in positions:
-        current_value = await price_service.calculate_current_value(p.metal_type, p.weight_grams)
+        effective_discount = get_effective_discount(p, user_settings)
+        current_value = await price_service.calculate_current_value(
+            p.metal_type,
+            p.weight_grams,
+            effective_discount
+        )
         total_purchase += p.purchase_price_eur
         total_current += current_value
         if p.metal_type in weights:

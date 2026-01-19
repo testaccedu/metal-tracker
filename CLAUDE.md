@@ -43,6 +43,17 @@ metal-tracker/
 - **Tiers:** Free (max 10 Positionen), Premium (unbegrenzt)
 - **Auth-Reihenfolge:** API-Key (X-API-Key Header) > JWT (Authorization: Bearer)
 
+## Discount-System
+- **Spot-Preise:** Live-Preise von GOLD.DE (100% Spot, keine fixen Abschlaege mehr)
+- **User-Settings:** Jeder User kann Default-Abschlaege pro Metall konfigurieren (0-100%)
+  - `default_discount_gold`: Standard-Abschlag fuer Gold-Positionen
+  - `default_discount_silver`: Standard-Abschlag fuer Silber-Positionen
+  - `default_discount_platinum`: Standard-Abschlag fuer Platin-Positionen
+  - `default_discount_palladium`: Standard-Abschlag fuer Palladium-Positionen
+- **Position-Discount:** Jede Position kann einen eigenen Discount haben (ueberschreibt User-Default)
+- **Berechnung:** `Wert = Spot-Preis × (1 - Discount/100) × Gewicht`
+- **Beispiel:** Gold-Position mit 5% Discount → 95% vom Spot-Preis
+
 ## Wichtige Endpoints
 | Methode | Endpoint | Auth | Beschreibung |
 |---------|----------|------|--------------|
@@ -53,7 +64,9 @@ metal-tracker/
 | POST | /api/auth/api-keys | Ja | API-Key erstellen |
 | GET | /api/auth/api-keys | Ja | API-Keys auflisten |
 | DELETE | /api/auth/api-keys/{id} | Ja | API-Key loeschen |
-| GET | /api/prices | Nein | Live-Preise von GOLD.DE |
+| GET | /api/settings | Ja | User-Settings abrufen |
+| PUT | /api/settings | Ja | User-Settings aktualisieren |
+| GET | /api/prices | Nein | Live-Preise von GOLD.DE (Spot) |
 | GET | /api/positions | Ja | Alle Positionen des Users |
 | POST | /api/positions | Ja | Position erstellen |
 | DELETE | /api/positions/{id} | Ja | Position loeschen |
@@ -115,6 +128,67 @@ python main.py
 # Test-Login: admin@local.dev / testpassword123
 ```
 
+## Datenbank-Migrations-Workflow (KRITISCH!)
+
+### REGEL: Vor JEDER DB-Schema-Änderung
+
+**NIEMALS** direkt `models.py` ändern und deployen! **IMMER** diesen Workflow befolgen:
+
+#### 1. Backup erstellen
+```bash
+# Heroku-DB sichern
+heroku pg:backups:capture --app metal-tracker-tn
+
+# Backup lokal herunterladen
+heroku pg:backups:url b001 --app metal-tracker-tn  # b001 = neuestes Backup
+curl -o "backups/heroku_backup_$(date +%Y%m%d_%H%M%S).dump" "<backup-url>"
+```
+
+#### 2. Lokale DB mit Produktionsdaten befüllen
+```bash
+# Script zum Import von PostgreSQL Dump in SQLite
+python import_production_data.py
+```
+
+#### 3. Alembic Migration erstellen
+```bash
+# NACH Änderung in models.py:
+alembic revision --autogenerate -m "Beschreibung der Änderung"
+
+# Migration prüfen in: alembic/versions/XXX_beschreibung.py
+# WICHTIG: Autogenerate kann Dinge übersehen! Immer manuell prüfen!
+```
+
+#### 4. Lokal testen (mit Produktionsdaten!)
+```bash
+# Migration lokal anwenden
+alembic upgrade head
+
+# App lokal starten und testen
+python main.py
+
+# Bei Problemen: Migration zurückrollen
+alembic downgrade -1
+```
+
+#### 5. Erst dann deployen
+```bash
+# WENN lokaler Test erfolgreich:
+git add alembic/versions/*.py models.py
+git commit -m "[MIGRATION] Beschreibung"
+git push heroku master
+
+# Heroku führt Migrationen NICHT automatisch aus!
+# Migrations-Script als Release-Phase in Procfile:
+# release: alembic upgrade head
+```
+
+### Wichtige Hinweise
+- **Produktionsdaten lokal testen:** Verhindert Datenverlust bei Schema-Änderungen
+- **Alembic Migrations sind Pflicht:** Kein `Base.metadata.create_all()` mehr auf Produktion!
+- **Backups vor JEDEM Deployment:** Schnelle Rollback-Möglichkeit
+- **Migration-Downgrade testen:** Sicherstellen, dass Rollback funktioniert
+
 ## Deployment (Heroku)
 ```bash
 # WICHTIG: Vor Schema-Aenderungen IMMER Backup!
@@ -162,6 +236,7 @@ heroku pg:backups:restore <backup-id> --app metal-tracker-tn
 - Historische Daten werden ab Positionserstellung gesammelt (keine Backfill-Funktion)
 - CDN-Abhaengigkeit fuer Tailwind/Chart.js
 - passlib 1.7.4 zeigt Warnung mit bcrypt 4.2.0 (funktioniert aber)
+- Spot-Preise von GOLD.DE, Discounts werden per User konfiguriert
 
 ## API-Nutzung mit API-Key
 ```bash
