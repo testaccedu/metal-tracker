@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 
 import models
 import schemas
-from schemas import convert_to_grams
+from schemas import convert_to_grams, REFERENCE_SPREADS, get_default_spread
 from database import engine, get_db, Base
 import price_service
 import auth as auth_module
@@ -168,10 +168,16 @@ async def create_position(
     weight_per_unit_grams = convert_to_grams(position.weight_per_unit, position.weight_unit.value)
     total_weight_grams = weight_per_unit_grams * position.quantity
 
+    # Spread-Kategorie und -Prozent bestimmen
+    spread_category = position.spread_category.value if position.spread_category else "bar_large"
+    # Neues spread_percent hat Vorrang, Fallback auf altes discount_percent
+    spread_percent = position.spread_percent if position.spread_percent is not None else position.discount_percent
+
     db_position = models.Position(
         user_id=user.id,
         metal_type=position.metal_type.value,
         product_type=position.product_type.value,
+        spread_category=spread_category,
         description=position.description,
         quantity=position.quantity,
         weight_per_unit=position.weight_per_unit,
@@ -179,7 +185,8 @@ async def create_position(
         weight_grams=total_weight_grams,
         purchase_price_eur=position.purchase_price_eur,
         purchase_date=position.purchase_date,
-        discount_percent=position.discount_percent
+        spread_percent=spread_percent,
+        discount_percent=spread_percent  # Fuer Abwaertskompatibilitaet
     )
     db.add(db_position)
     db.commit()
@@ -257,6 +264,14 @@ async def update_position(
         update_data["metal_type"] = update_data["metal_type"].value
     if "product_type" in update_data and update_data["product_type"]:
         update_data["product_type"] = update_data["product_type"].value
+    if "spread_category" in update_data and update_data["spread_category"]:
+        update_data["spread_category"] = update_data["spread_category"].value
+
+    # spread_percent und discount_percent synchron halten
+    if "spread_percent" in update_data:
+        update_data["discount_percent"] = update_data["spread_percent"]
+    elif "discount_percent" in update_data:
+        update_data["spread_percent"] = update_data["discount_percent"]
 
     # Gewicht neu berechnen wenn geaendert
     if "weight_per_unit" in update_data or "weight_unit" in update_data or "quantity" in update_data:
@@ -344,6 +359,28 @@ async def update_settings(
     await update_daily_snapshot(db, user)
 
     return settings
+
+
+@app.get("/api/reference-spreads", tags=["Einstellungen"])
+@limiter.limit("30/minute")
+async def get_reference_spreads(request: Request):
+    """
+    Markt-Referenzwerte fuer Ankaufsabschlaege abrufen.
+    Diese Werte dienen als Orientierung fuer typische Haendler-Spreads.
+    """
+    return {
+        "spreads": REFERENCE_SPREADS,
+        "categories": [
+            {"value": "coin_bullion", "label": "Bullion-Muenze", "description": "Kruegerrand, Maple Leaf, Wiener Phil."},
+            {"value": "coin_numismatic", "label": "Sammlermuenze", "description": "Muenzen mit Sammleraufpreis"},
+            {"value": "bar_large", "label": "Barren (gross)", "description": "Ab 100g"},
+            {"value": "bar_small", "label": "Barren (klein)", "description": "Unter 100g"},
+            {"value": "bar_minted", "label": "Praege-Barren", "description": "Gepraegte Barren (Heraeus, PAMP)"},
+            {"value": "round", "label": "Medaille/Round", "description": "Runde Medaillen"},
+            {"value": "granulate", "label": "Granulat", "description": "Koerner/Granulat"},
+            {"value": "jewelry", "label": "Schmuck", "description": "Schmuckstuecke (hoechster Abschlag)"}
+        ]
+    }
 
 
 # === PORTFOLIO SUMMARY ===
@@ -497,7 +534,9 @@ def get_user_settings(db: Session, user: models.User) -> models.UserSettings:
     ).first()
 
     if not settings:
-        # Settings erstellen mit Default-Werten (0% Abschlag)
+        # Settings erstellen mit Default-Werten
+        # Neue Kategorie-basierte Spreads (Gold-Referenzwerte als Default)
+        default_spreads = REFERENCE_SPREADS.get("gold", {})
         settings = models.UserSettings(
             user_id=user.id,
             default_discount_gold=0.0,
@@ -505,52 +544,83 @@ def get_user_settings(db: Session, user: models.User) -> models.UserSettings:
             default_discount_platinum=0.0,
             default_discount_palladium=0.0
         )
+        settings.default_spreads = default_spreads
         db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    elif not settings.default_spreads:
+        # Migration: Alte Settings ohne default_spreads ergaenzen
+        settings.default_spreads = REFERENCE_SPREADS.get("gold", {})
         db.commit()
         db.refresh(settings)
 
     return settings
 
 
-def get_effective_discount(position: models.Position, user_settings: models.UserSettings) -> float:
+def get_effective_spread(position: models.Position, user_settings: models.UserSettings) -> float:
     """
-    Ermittelt den effektiven Discount fuer eine Position
+    Ermittelt den effektiven Ankaufsabschlag (Spread) fuer eine Position.
 
-    Wenn Position einen eigenen Discount hat, wird dieser verwendet.
-    Sonst wird der Default-Discount aus den UserSettings fuer das Metall verwendet.
+    Prioritaet:
+    1. Position-spezifischer spread_percent (oder altes discount_percent)
+    2. User-Default aus default_spreads fuer die Kategorie
+    3. Markt-Referenzwerte aus REFERENCE_SPREADS
     """
+    # 1. Position hat eigenen Spread
+    if position.spread_percent is not None:
+        return position.spread_percent
+    # Fallback auf altes Feld
     if position.discount_percent is not None:
         return position.discount_percent
 
-    # Default-Discount je nach Metall
-    discount_map = {
-        "gold": user_settings.default_discount_gold,
-        "silver": user_settings.default_discount_silver,
-        "platinum": user_settings.default_discount_platinum,
-        "palladium": user_settings.default_discount_palladium
-    }
+    # 2. User-Default fuer Kategorie
+    category = position.spread_category or "bar_large"
+    if user_settings.default_spreads:
+        if category in user_settings.default_spreads:
+            return user_settings.default_spreads[category]
 
-    return discount_map.get(position.metal_type, 0.0)
+    # 3. Fallback: Markt-Referenzwerte
+    metal = position.metal_type.lower()
+    return get_default_spread(metal, category)
+
+
+# Alias fuer Abwaertskompatibilitaet
+def get_effective_discount(position: models.Position, user_settings: models.UserSettings) -> float:
+    """DEPRECATED: Nutze get_effective_spread()"""
+    return get_effective_spread(position, user_settings)
 
 
 async def enrich_position(db: Session, position: models.Position, user: models.User) -> dict:
     """Reichert eine Position mit aktuellem Wert und Gewinn/Verlust an"""
-    # User-Settings laden um Default-Discount zu ermitteln
+    # User-Settings laden um Default-Spread zu ermitteln
     user_settings = get_user_settings(db, user)
-    effective_discount = get_effective_discount(position, user_settings)
+    effective_spread = get_effective_spread(position, user_settings)
 
-    current_value = await price_service.calculate_current_value(
+    # Spot-Wert (100%, ohne Spread)
+    spot_value = await price_service.calculate_current_value(
         position.metal_type,
         position.weight_grams,
-        effective_discount
+        0  # Kein Spread
     )
-    profit_loss = current_value - position.purchase_price_eur
+
+    # Ankaufswert (nach Spread-Abzug)
+    buyback_value = await price_service.calculate_current_value(
+        position.metal_type,
+        position.weight_grams,
+        effective_spread
+    )
+
+    # Spread-Betrag in EUR
+    spread_amount = spot_value - buyback_value
+
+    profit_loss = buyback_value - position.purchase_price_eur
     profit_loss_percent = (profit_loss / position.purchase_price_eur * 100) if position.purchase_price_eur > 0 else 0
 
     return {
         "id": position.id,
         "metal_type": position.metal_type,
         "product_type": position.product_type,
+        "spread_category": position.spread_category,
         "description": position.description,
         "quantity": position.quantity,
         "weight_per_unit": position.weight_per_unit,
@@ -558,12 +628,19 @@ async def enrich_position(db: Session, position: models.Position, user: models.U
         "weight_grams": round(position.weight_grams, 4),
         "purchase_price_eur": position.purchase_price_eur,
         "purchase_date": position.purchase_date,
+        # Neue Spread-Felder
+        "spread_percent": position.spread_percent,
+        "effective_spread_percent": round(effective_spread, 2),
+        "spot_value_eur": round(spot_value, 2),
+        "spread_amount_eur": round(spread_amount, 2),
+        # Deprecated, fuer Abwaertskompatibilitaet
         "discount_percent": position.discount_percent,
-        "created_at": position.created_at,
-        "updated_at": position.updated_at,
-        "current_value_eur": round(current_value, 2),
+        # Ankaufswert = current_value
+        "current_value_eur": round(buyback_value, 2),
         "profit_loss_eur": round(profit_loss, 2),
-        "profit_loss_percent": round(profit_loss_percent, 2)
+        "profit_loss_percent": round(profit_loss_percent, 2),
+        "created_at": position.created_at,
+        "updated_at": position.updated_at
     }
 
 

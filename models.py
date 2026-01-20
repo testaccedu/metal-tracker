@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+import json
 
 
 class User(Base):
@@ -40,6 +41,10 @@ class Position(Base):
     product_type = Column(String, nullable=False, default="bar")  # coin, bar, round, granulate, jewelry
     description = Column(String, nullable=True)
 
+    # NEU: Spread-Kategorie fuer Ankaufsabschlag
+    # coin_bullion, coin_numismatic, bar_large, bar_small, bar_minted, round, granulate, jewelry
+    spread_category = Column(String(50), nullable=True, default="bar_large")
+
     # Anzahl und Gewicht
     quantity = Column(Integer, nullable=False, default=1)  # Stueckzahl
     weight_per_unit = Column(Float, nullable=False)  # Gewicht pro Stueck in der gewaehlten Einheit
@@ -49,8 +54,11 @@ class Position(Base):
     purchase_price_eur = Column(Float, nullable=False)  # Gesamtpreis fuer alle Stuecke
     purchase_date = Column(Date, nullable=True)
 
-    # Abschlag in Prozent (z.B. 5.0 fuer 5% unter Marktpreis)
+    # NEU: Ankaufsabschlag in Prozent (z.B. 5.0 fuer 5% unter Spot)
     # Optional - wenn nicht gesetzt, wird der Default aus UserSettings verwendet
+    spread_percent = Column(Float, nullable=True, default=None)
+
+    # DEPRECATED: Wird durch spread_percent ersetzt, bleibt fuer Datenmigration
     discount_percent = Column(Float, nullable=True, default=None)
 
     created_at = Column(DateTime, server_default=func.now())
@@ -96,14 +104,18 @@ class ApiKey(Base):
 
 
 class UserSettings(Base):
-    """User-spezifische Einstellungen (Default-Abschlaege pro Edelmetall)"""
+    """User-spezifische Einstellungen (Default-Ankaufsabschlaege pro Kategorie)"""
     __tablename__ = "user_settings"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
 
-    # Default-Abschlaege pro Edelmetall in Prozent (z.B. 5.0 fuer 5%)
-    # Diese werden verwendet wenn eine Position keinen spezifischen Abschlag hat
+    # NEU: Kategorie-basierte Default-Spreads als JSON-String
+    # Format: {"coin_bullion": 3.0, "bar_large": 2.0, ...}
+    # Wird als Text gespeichert fuer SQLite-Kompatibilitaet
+    _default_spreads = Column("default_spreads", Text, nullable=True)
+
+    # DEPRECATED: Alte Metall-basierte Felder bleiben fuer Migration und Abwaertskompatibilitaet
     default_discount_gold = Column(Float, nullable=False, default=0.0)
     default_discount_silver = Column(Float, nullable=False, default=0.0)
     default_discount_platinum = Column(Float, nullable=False, default=0.0)
@@ -114,3 +126,21 @@ class UserSettings(Base):
 
     # Relationship
     user = relationship("User", back_populates="settings")
+
+    @property
+    def default_spreads(self) -> dict[str, float]:
+        """Getter: JSON-String zu Dict"""
+        if self._default_spreads:
+            try:
+                return json.loads(self._default_spreads)
+            except (json.JSONDecodeError, TypeError):
+                return {}
+        return {}
+
+    @default_spreads.setter
+    def default_spreads(self, value: dict[str, float]):
+        """Setter: Dict zu JSON-String"""
+        if value:
+            self._default_spreads = json.dumps(value)
+        else:
+            self._default_spreads = None

@@ -6,7 +6,7 @@ from typing import Optional
 # Copyright: GOLD.DE - Preise ohne Gewaehr
 
 CACHE_DURATION_MINUTES = 5
-# HINWEIS: Discounts werden direkt in den User-Settings konfiguriert (default_discount_*)
+# HINWEIS: Ankaufsabschlaege (Spreads) werden in User-Settings pro Kategorie konfiguriert
 
 # Cache fuer Preise
 _price_cache: dict = {}
@@ -93,25 +93,55 @@ async def get_all_prices() -> dict[str, dict]:
     return result
 
 
-async def calculate_current_value(metal_type: str, weight_grams: float, discount_percent: float = 0.0) -> float:
+async def calculate_current_value(metal_type: str, weight_grams: float, spread_percent: float = 0.0) -> float:
     """
-    Berechnet den aktuellen Wert einer Position basierend auf Spot-Preis minus Discount
+    Berechnet den Ankaufswert einer Position (Spot-Preis minus Spread).
 
     Args:
         metal_type: Art des Edelmetalls (gold, silver, platinum, palladium)
         weight_grams: Gewicht in Gramm
-        discount_percent: Abschlag vom Spot-Preis in Prozent (z.B. 5.0 fuer 5%)
+        spread_percent: Ankaufsabschlag in Prozent (z.B. 5.0 fuer 5%)
 
     Returns:
-        Aktueller Wert in EUR (Spot-Preis minus Discount)
+        Ankaufswert in EUR (was ein Haendler typischerweise zahlt)
     """
     spot_price_per_gram = await get_price_per_gram(metal_type)
 
-    # Abschlag vom Spot-Preis anwenden (z.B. 5% Abschlag -> Faktor 0.95)
-    if discount_percent > 0:
-        spot_price_per_gram = spot_price_per_gram * (1 - discount_percent / 100)
+    # Spread vom Spot-Preis abziehen (z.B. 5% Spread -> Faktor 0.95)
+    if spread_percent > 0:
+        spot_price_per_gram = spot_price_per_gram * (1 - spread_percent / 100)
 
     return round(spot_price_per_gram * weight_grams, 2)
+
+
+async def calculate_position_values(
+    metal_type: str,
+    weight_grams: float,
+    spread_percent: float = 0.0
+) -> dict:
+    """
+    Berechnet Spot-Wert UND Ankaufswert fuer eine Position.
+
+    Args:
+        metal_type: Art des Edelmetalls
+        weight_grams: Gewicht in Gramm
+        spread_percent: Ankaufsabschlag in Prozent
+
+    Returns:
+        Dict mit spot_value_eur, buyback_value_eur, spread_eur, spread_percent
+    """
+    spot_price_per_gram = await get_price_per_gram(metal_type)
+    spot_value = spot_price_per_gram * weight_grams
+
+    buyback_value = spot_value * (1 - spread_percent / 100) if spread_percent > 0 else spot_value
+    spread_eur = spot_value - buyback_value
+
+    return {
+        "spot_value_eur": round(spot_value, 2),
+        "buyback_value_eur": round(buyback_value, 2),
+        "spread_percent": spread_percent,
+        "spread_eur": round(spread_eur, 2)
+    }
 
 
 def get_source_info() -> dict:
@@ -120,6 +150,6 @@ def get_source_info() -> dict:
         "source": "GOLD.DE",
         "api_url": "https://api.edelmetalle.de/public.json",
         "copyright": "Preise von GOLD.DE - ohne Gewaehr",
-        "price_type": "Spot-Preis (Discounts werden per User-Settings angewendet)",
+        "price_type": "Spot-Preis (Ankaufsabschlaege werden per User-Settings/Kategorie angewendet)",
         "cache_minutes": CACHE_DURATION_MINUTES
     }

@@ -15,6 +15,48 @@ from sqlalchemy import func
 from database import SessionLocal
 import models
 import price_service
+from schemas import REFERENCE_SPREADS, get_default_spread
+
+
+def get_user_settings(db, user: models.User) -> models.UserSettings:
+    """Holt oder erstellt die UserSettings fuer einen User"""
+    settings = db.query(models.UserSettings).filter(
+        models.UserSettings.user_id == user.id
+    ).first()
+
+    if not settings:
+        settings = models.UserSettings(
+            user_id=user.id,
+            default_discount_gold=0.0,
+            default_discount_silver=0.0,
+            default_discount_platinum=0.0,
+            default_discount_palladium=0.0
+        )
+        settings.default_spreads = REFERENCE_SPREADS.get("gold", {})
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+
+    return settings
+
+
+def get_effective_spread(position: models.Position, user_settings: models.UserSettings) -> float:
+    """Ermittelt den effektiven Spread fuer eine Position"""
+    # 1. Position hat eigenen Spread
+    if position.spread_percent is not None:
+        return position.spread_percent
+    if position.discount_percent is not None:
+        return position.discount_percent
+
+    # 2. User-Default fuer Kategorie
+    category = position.spread_category or "bar_large"
+    if user_settings.default_spreads:
+        if category in user_settings.default_spreads:
+            return user_settings.default_spreads[category]
+
+    # 3. Fallback: Markt-Referenzwerte
+    metal = position.metal_type.lower()
+    return get_default_spread(metal, category)
 
 
 async def create_snapshot_for_user(db, user: models.User) -> bool:
@@ -27,12 +69,21 @@ async def create_snapshot_for_user(db, user: models.User) -> bool:
     if not positions:
         return False
 
+    # User-Settings laden fuer Spread-Berechnung
+    user_settings = get_user_settings(db, user)
+
     total_purchase = 0.0
     total_current = 0.0
     weights = {"gold": 0, "silver": 0, "platinum": 0, "palladium": 0}
 
     for p in positions:
-        current_value = await price_service.calculate_current_value(p.metal_type, p.weight_grams)
+        # BUG FIX: Effektiven Spread beruecksichtigen!
+        effective_spread = get_effective_spread(p, user_settings)
+        current_value = await price_service.calculate_current_value(
+            p.metal_type,
+            p.weight_grams,
+            effective_spread
+        )
         total_purchase += p.purchase_price_eur
         total_current += current_value
         if p.metal_type in weights:

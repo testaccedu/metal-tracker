@@ -119,7 +119,7 @@
                 <p id="total-purchase" class="text-xl font-bold mt-1">-</p>
             </div>
             <div class="bg-gray-800 rounded-lg p-4 border-l-4 border-yellow-500">
-                <p class="text-gray-400 text-xs uppercase tracking-wide">Aktueller Wert</p>
+                <p class="text-gray-400 text-xs uppercase tracking-wide">Ankaufswert</p>
                 <p id="total-current" class="text-xl font-bold mt-1">-</p>
             </div>
             <div class="bg-gray-800 rounded-lg p-4 border-l-4 border-green-500">
@@ -187,7 +187,7 @@
                     </div>
                 </div>
                 <p class="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-700">
-                    Quelle: GOLD.DE (95% Spot)
+                    Quelle: GOLD.DE (Spot-Preise)
                 </p>
             </div>
         </div>
@@ -205,13 +205,13 @@
                     <thead>
                         <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
                             <th class="text-left py-2 px-1">Metall</th>
-                            <th class="text-left py-2 px-1">Art</th>
+                            <th class="text-left py-2 px-1">Kategorie</th>
                             <th class="text-left py-2 px-1">Beschreibung</th>
                             <th class="text-right py-2 px-1">Anz.</th>
                             <th class="text-right py-2 px-1">Gewicht</th>
                             <th class="text-right py-2 px-1">Kaufdatum</th>
                             <th class="text-right py-2 px-1">Kaufpreis</th>
-                            <th class="text-right py-2 px-1">Aktuell</th>
+                            <th class="text-right py-2 px-1">Ankauf</th>
                             <th class="text-right py-2 px-1">+/-</th>
                             <th class="text-center py-2 px-1"></th>
                         </tr>
@@ -258,7 +258,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs text-gray-400 mb-1.5">Metall</label>
-                        <select id="metal-type" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
+                        <select id="metal-type" onchange="updateSpreadReference()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
                             <option value="gold">Gold</option>
                             <option value="silver">Silber</option>
                             <option value="platinum">Platin</option>
@@ -266,13 +266,22 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1.5">Art</label>
-                        <select id="product-type" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
-                            <option value="coin">Münze</option>
-                            <option value="bar">Barren</option>
-                            <option value="round">Medaille</option>
-                            <option value="granulate">Granulat</option>
-                            <option value="jewelry">Schmuck</option>
+                        <label class="block text-xs text-gray-400 mb-1.5">Kategorie</label>
+                        <select id="spread-category" onchange="updateSpreadReference()" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
+                            <optgroup label="Muenzen">
+                                <option value="coin_bullion">Bullion-Muenze</option>
+                                <option value="coin_numismatic">Sammlermuenze</option>
+                            </optgroup>
+                            <optgroup label="Barren">
+                                <option value="bar_large" selected>Barren (ab 100g)</option>
+                                <option value="bar_small">Barren (unter 100g)</option>
+                                <option value="bar_minted">Praege-Barren</option>
+                            </optgroup>
+                            <optgroup label="Sonstiges">
+                                <option value="round">Medaille/Round</option>
+                                <option value="granulate">Granulat</option>
+                                <option value="jewelry">Schmuck</option>
+                            </optgroup>
                         </select>
                     </div>
                 </div>
@@ -312,11 +321,19 @@
                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1.5">Abschlag % <span class="text-gray-500">(optional)</span></label>
-                    <input type="number" id="discount-percent" step="0.1" min="0" max="100" placeholder="Standard verwenden"
-                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none placeholder-gray-500"
-                           title="Optional: Abschlag in %. Wenn leer, wird der Standard aus den Einstellungen verwendet.">
+                <div class="bg-gray-700/50 rounded-lg p-3 border border-gray-600/50">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs text-gray-400">Ankaufsabschlag</label>
+                        <span id="spread-reference" class="text-xs text-gray-500">Markt: ~3%</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="use-custom-spread" onchange="toggleCustomSpread()" class="rounded bg-gray-600 border-gray-500 text-yellow-500 focus:ring-yellow-500">
+                        <label for="use-custom-spread" class="text-sm text-gray-300">Eigenen Wert verwenden</label>
+                    </div>
+                    <input type="number" id="spread-percent" step="0.1" min="0" max="100" placeholder="z.B. 5"
+                           class="hidden w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-sm mt-2 focus:ring-2 focus:ring-yellow-500 focus:border-transparent focus:outline-none placeholder-gray-400"
+                           title="Ankaufsabschlag in % (was ein Haendler typischerweise unter Spot zahlt)">
+                    <p class="text-xs text-gray-500 mt-2">Der Ankaufsabschlag wird aus deinen Einstellungen geholt, falls kein eigener Wert angegeben wird.</p>
                 </div>
                 <div class="flex gap-3 pt-3">
                     <button type="button" onclick="hideAddPositionModal()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2.5 rounded-lg transition border border-gray-600">
@@ -385,7 +402,7 @@
                 </div>
                 <div class="flex px-6 mt-4">
                     <button onclick="showSettingsTab('discounts')" id="tab-discounts" class="px-4 py-2 text-sm font-medium border-b-2 border-yellow-500 text-yellow-500 transition">
-                        Abschläge
+                        Ankaufsabschlaege
                     </button>
                     <button onclick="showSettingsTab('apikeys')" id="tab-apikeys" class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 transition">
                         API-Keys
@@ -395,40 +412,107 @@
 
             <!-- Tab Content -->
             <div class="flex-1 overflow-y-auto p-6">
-                <!-- Discounts Tab -->
+                <!-- Spreads Tab -->
                 <div id="settings-discounts" class="space-y-4">
-                    <p class="text-gray-400 text-sm">Standard-Abschläge pro Edelmetall (in %). Diese werden verwendet, wenn eine Position keinen eigenen Abschlag hat.</p>
+                    <p class="text-gray-400 text-sm">Standard-Ankaufsabschlaege pro Kategorie (in %). Diese werden verwendet, wenn eine Position keinen eigenen Abschlag hat.</p>
 
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Gold</label>
-                            <input type="number" id="settings-gold" step="0.1" min="0" max="100" placeholder="0"
-                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                    <!-- Muenzen -->
+                    <div class="bg-gray-700/30 rounded-lg p-3">
+                        <h4 class="text-sm font-medium text-yellow-500 mb-2">Muenzen</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Bullion-Muenze</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-coin_bullion" step="0.1" min="0" max="100" placeholder="3"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~3%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Sammlermuenze</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-coin_numismatic" step="0.1" min="0" max="100" placeholder="8"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~8%</span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Silber</label>
-                            <input type="number" id="settings-silver" step="0.1" min="0" max="100" placeholder="0"
-                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                    </div>
+
+                    <!-- Barren -->
+                    <div class="bg-gray-700/30 rounded-lg p-3">
+                        <h4 class="text-sm font-medium text-yellow-500 mb-2">Barren</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Gross (ab 100g)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-bar_large" step="0.1" min="0" max="100" placeholder="2"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~2%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Klein (unter 100g)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-bar_small" step="0.1" min="0" max="100" placeholder="4"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~4%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Praege-Barren</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-bar_minted" step="0.1" min="0" max="100" placeholder="3.5"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~3.5%</span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Platin</label>
-                            <input type="number" id="settings-platinum" step="0.1" min="0" max="100" placeholder="0"
-                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Palladium</label>
-                            <input type="number" id="settings-palladium" step="0.1" min="0" max="100" placeholder="0"
-                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                    </div>
+
+                    <!-- Sonstiges -->
+                    <div class="bg-gray-700/30 rounded-lg p-3">
+                        <h4 class="text-sm font-medium text-yellow-500 mb-2">Sonstiges</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Medaille/Round</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-round" step="0.1" min="0" max="100" placeholder="5"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~5%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Granulat</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-granulate" step="0.1" min="0" max="100" placeholder="2"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~2%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Schmuck</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="spread-jewelry" step="0.1" min="0" max="100" placeholder="15"
+                                           class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                                    <span class="text-xs text-gray-500 whitespace-nowrap">~15%</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <p class="text-xs text-gray-500">
-                        Die Abschläge werden zusätzlich zum allgemeinen Ankaufsfaktor (95% vom Spot) angewendet.
+                        Die Referenzwerte (~) sind typische Haendler-Ankaufswerte unter Spot-Preis fuer Gold. Silber hat hoehere Abschlaege.
                     </p>
 
-                    <button onclick="saveSettings()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2.5 rounded transition">
-                        Speichern
-                    </button>
+                    <div class="flex gap-3">
+                        <button onclick="resetSpreadsToDefault()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2.5 rounded transition border border-gray-600">
+                            Zuruecksetzen
+                        </button>
+                        <button onclick="saveSettings()" class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2.5 rounded transition">
+                            Speichern
+                        </button>
+                    </div>
                 </div>
 
                 <!-- API Keys Tab -->
@@ -572,7 +656,45 @@
 
         const metalNames = { gold: 'Gold', silver: 'Silber', platinum: 'Platin', palladium: 'Palladium' };
         const metalColors = { gold: 'gold-text', silver: 'silver-text', platinum: 'platinum-text', palladium: 'palladium-text' };
-        const productNames = { coin: 'Münze', bar: 'Barren', round: 'Medaille', granulate: 'Granulat', jewelry: 'Schmuck' };
+        const productNames = { coin: 'Muenze', bar: 'Barren', round: 'Medaille', granulate: 'Granulat', jewelry: 'Schmuck' };
+        const spreadCategoryNames = {
+            coin_bullion: 'Bullion-Muenze',
+            coin_numismatic: 'Sammlermuenze',
+            bar_large: 'Barren (gross)',
+            bar_small: 'Barren (klein)',
+            bar_minted: 'Praege-Barren',
+            round: 'Medaille',
+            granulate: 'Granulat',
+            jewelry: 'Schmuck'
+        };
+
+        // Markt-Referenzwerte fuer Spreads (Gold als Basis)
+        const REFERENCE_SPREADS = {
+            gold: { coin_bullion: 3.0, coin_numismatic: 8.0, bar_large: 2.0, bar_small: 4.0, bar_minted: 3.5, round: 5.0, granulate: 2.0, jewelry: 15.0 },
+            silver: { coin_bullion: 15.0, coin_numismatic: 20.0, bar_large: 12.0, bar_small: 18.0, bar_minted: 15.0, round: 18.0, granulate: 12.0, jewelry: 30.0 },
+            platinum: { coin_bullion: 5.0, coin_numismatic: 10.0, bar_large: 4.0, bar_small: 6.0, bar_minted: 5.0, round: 8.0, granulate: 4.0, jewelry: 20.0 },
+            palladium: { coin_bullion: 6.0, coin_numismatic: 12.0, bar_large: 5.0, bar_small: 7.0, bar_minted: 6.0, round: 10.0, granulate: 5.0, jewelry: 25.0 }
+        };
+
+        // Update der Referenz-Anzeige im Modal
+        function updateSpreadReference() {
+            const metal = document.getElementById('metal-type').value;
+            const category = document.getElementById('spread-category').value;
+            const refSpread = REFERENCE_SPREADS[metal]?.[category] || 5.0;
+            document.getElementById('spread-reference').textContent = 'Markt: ~' + refSpread + '%';
+        }
+
+        function toggleCustomSpread() {
+            const checkbox = document.getElementById('use-custom-spread');
+            const input = document.getElementById('spread-percent');
+            if (checkbox.checked) {
+                input.classList.remove('hidden');
+                input.focus();
+            } else {
+                input.classList.add('hidden');
+                input.value = '';
+            }
+        }
 
         // Daten laden
         async function loadPrices() {
@@ -635,19 +757,19 @@
                 tbody.innerHTML = positions.map(p => `
                     <tr class="border-b border-gray-700/50 hover:bg-gray-700/30">
                         <td class="py-3 px-1 ${metalColors[p.metal_type] || ''} font-medium">${escapeHtml(metalNames[p.metal_type] || p.metal_type)}</td>
-                        <td class="py-3 px-1 text-gray-400">${escapeHtml(productNames[p.product_type] || p.product_type)}</td>
+                        <td class="py-3 px-1 text-gray-400 text-xs">${escapeHtml(spreadCategoryNames[p.spread_category] || productNames[p.product_type] || p.product_type)}</td>
                         <td class="py-3 px-1">${escapeHtml(p.description) || '-'}</td>
                         <td class="py-3 px-1 text-right">${parseInt(p.quantity)}x</td>
                         <td class="py-3 px-1 text-right font-mono text-xs">${p.quantity > 1 ? parseInt(p.quantity) + 'x ' : ''}${formatWeight(p.weight_per_unit, p.weight_unit)}</td>
                         <td class="py-3 px-1 text-right text-xs text-gray-400">${p.purchase_date ? formatDate(p.purchase_date) : '-'}</td>
                         <td class="py-3 px-1 text-right">${formatEUR(p.purchase_price_eur)}</td>
-                        <td class="py-3 px-1 text-right font-medium">${formatEUR(p.current_value_eur)}</td>
+                        <td class="py-3 px-1 text-right font-medium" title="Spread: ${p.effective_spread_percent || 0}%">${formatEUR(p.current_value_eur)}</td>
                         <td class="py-3 px-1 text-right ${p.profit_loss_eur >= 0 ? 'positive' : 'negative'}">
                             ${(p.profit_loss_eur >= 0 ? '+' : '') + formatEUR(p.profit_loss_eur)}<br>
                             <span class="text-xs opacity-75">${formatPercent(p.profit_loss_percent)}</span>
                         </td>
                         <td class="py-3 px-1 text-center">
-                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition" title="Löschen">
+                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition" title="Loeschen">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
@@ -662,10 +784,10 @@
                         <div class="flex justify-between items-start mb-2">
                             <div>
                                 <h3 class="${metalColors[p.metal_type] || ''} font-medium text-base">${escapeHtml(metalNames[p.metal_type] || p.metal_type)}</h3>
-                                <p class="text-gray-400 text-xs">${escapeHtml(productNames[p.product_type] || p.product_type)}${p.description ? ' · ' + escapeHtml(p.description) : ''}</p>
+                                <p class="text-gray-400 text-xs">${escapeHtml(spreadCategoryNames[p.spread_category] || productNames[p.product_type] || p.product_type)}${p.description ? ' · ' + escapeHtml(p.description) : ''}</p>
                                 ${p.purchase_date ? `<p class="text-gray-500 text-xs mt-1">Gekauft: ${formatDate(p.purchase_date)}</p>` : ''}
                             </div>
-                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition p-1" title="Löschen">
+                            <button onclick="deletePosition(${parseInt(p.id)})" class="text-gray-500 hover:text-red-400 transition p-1" title="Loeschen">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
@@ -681,7 +803,7 @@
                                 <p>${formatEUR(p.purchase_price_eur)}</p>
                             </div>
                             <div>
-                                <p class="text-gray-500 text-xs">Aktueller Wert</p>
+                                <p class="text-gray-500 text-xs">Ankaufswert</p>
                                 <p class="font-medium">${formatEUR(p.current_value_eur)}</p>
                             </div>
                             <div class="text-right">
@@ -767,18 +889,28 @@
         async function addPosition(e) {
             e.preventDefault();
 
-            const discountValue = document.getElementById('discount-percent').value;
+            const spreadValue = document.getElementById('spread-percent').value;
+            const useCustomSpread = document.getElementById('use-custom-spread').checked;
+            const spreadCategory = document.getElementById('spread-category').value;
+
+            // Mappe spread_category zu product_type fuer Abwaertskompatibilitaet
+            const categoryToProduct = {
+                coin_bullion: 'coin', coin_numismatic: 'coin',
+                bar_large: 'bar', bar_small: 'bar', bar_minted: 'bar',
+                round: 'round', granulate: 'granulate', jewelry: 'jewelry'
+            };
 
             const data = {
                 metal_type: document.getElementById('metal-type').value,
-                product_type: document.getElementById('product-type').value,
+                product_type: categoryToProduct[spreadCategory] || 'bar',
+                spread_category: spreadCategory,
                 description: document.getElementById('description').value || null,
                 quantity: parseInt(document.getElementById('quantity').value) || 1,
                 weight_per_unit: parseFloat(document.getElementById('weight').value),
                 weight_unit: document.getElementById('weight-unit').value,
                 purchase_price_eur: parseFloat(document.getElementById('purchase-price').value),
                 purchase_date: document.getElementById('purchase-date').value || null,
-                discount_percent: discountValue ? parseFloat(discountValue) : null
+                spread_percent: useCustomSpread && spreadValue ? parseFloat(spreadValue) : null
             };
 
             try {
@@ -794,6 +926,11 @@
                     document.getElementById('weight-unit').value = 'oz';
                     document.getElementById('quantity').value = '1';
                     document.getElementById('weight').value = '1';
+                    document.getElementById('spread-category').value = 'bar_large';
+                    document.getElementById('use-custom-spread').checked = false;
+                    document.getElementById('spread-percent').classList.add('hidden');
+                    document.getElementById('spread-percent').value = '';
+                    updateSpreadReference();
                     hideAddPositionModal();
                     loadAll();
                 } else {
@@ -958,15 +1095,30 @@
                 if (!res) return;
                 if (res.ok) {
                     const settings = await res.json();
-                    document.getElementById('settings-gold').value = settings.default_discount_gold || 0;
-                    document.getElementById('settings-silver').value = settings.default_discount_silver || 0;
-                    document.getElementById('settings-platinum').value = settings.default_discount_platinum || 0;
-                    document.getElementById('settings-palladium').value = settings.default_discount_palladium || 0;
+                    // Neue kategorie-basierte Spreads laden
+                    const spreads = settings.default_spreads || REFERENCE_SPREADS.gold;
+                    const categories = ['coin_bullion', 'coin_numismatic', 'bar_large', 'bar_small', 'bar_minted', 'round', 'granulate', 'jewelry'];
+                    categories.forEach(cat => {
+                        const input = document.getElementById('spread-' + cat);
+                        if (input) {
+                            input.value = spreads[cat] ?? REFERENCE_SPREADS.gold[cat] ?? 0;
+                        }
+                    });
                     document.getElementById('settings-modal').classList.remove('hidden');
                 }
             } catch (e) {
                 console.error('Fehler beim Laden der Einstellungen:', e);
             }
+        }
+
+        function resetSpreadsToDefault() {
+            const categories = ['coin_bullion', 'coin_numismatic', 'bar_large', 'bar_small', 'bar_minted', 'round', 'granulate', 'jewelry'];
+            categories.forEach(cat => {
+                const input = document.getElementById('spread-' + cat);
+                if (input) {
+                    input.value = REFERENCE_SPREADS.gold[cat] ?? 0;
+                }
+            });
         }
 
         function hideSettingsModal() {
@@ -996,11 +1148,23 @@
         }
 
         async function saveSettings() {
+            // Kategorie-basierte Spreads sammeln
+            const categories = ['coin_bullion', 'coin_numismatic', 'bar_large', 'bar_small', 'bar_minted', 'round', 'granulate', 'jewelry'];
+            const default_spreads = {};
+            categories.forEach(cat => {
+                const input = document.getElementById('spread-' + cat);
+                if (input) {
+                    default_spreads[cat] = parseFloat(input.value) || REFERENCE_SPREADS.gold[cat] || 0;
+                }
+            });
+
             const data = {
-                default_discount_gold: parseFloat(document.getElementById('settings-gold').value) || 0,
-                default_discount_silver: parseFloat(document.getElementById('settings-silver').value) || 0,
-                default_discount_platinum: parseFloat(document.getElementById('settings-platinum').value) || 0,
-                default_discount_palladium: parseFloat(document.getElementById('settings-palladium').value) || 0
+                default_spreads: default_spreads,
+                // Alte Felder fuer Abwaertskompatibilitaet (mit Gold-Werten)
+                default_discount_gold: default_spreads.bar_large || 0,
+                default_discount_silver: 0,
+                default_discount_platinum: 0,
+                default_discount_palladium: 0
             };
 
             try {
