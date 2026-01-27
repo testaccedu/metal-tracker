@@ -22,7 +22,9 @@ from routers import auth as auth_router
 # === KONFIGURATION ===
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://metal-tracker-tn-ffb450a69489.herokuapp.com").split(",")
-SESSION_SECRET = os.getenv("SESSION_SECRET", "change-me-in-production")
+SESSION_SECRET = os.getenv("SESSION_SECRET")
+if not SESSION_SECRET:
+    raise RuntimeError("FATAL: SESSION_SECRET Umgebungsvariable ist nicht gesetzt! App kann nicht sicher starten.")
 
 # Pfad zum static Verzeichnis
 STATIC_DIR = Path(__file__).parent / "static"

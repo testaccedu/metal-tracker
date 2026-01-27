@@ -20,7 +20,9 @@ import schemas
 from database import get_db
 
 # === KONFIGURATION ===
-JWT_SECRET = os.getenv("JWT_SECRET", "CHANGE-ME-IN-PRODUCTION-supersecretkey123")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("FATAL: JWT_SECRET Umgebungsvariable ist nicht gesetzt! App kann nicht sicher starten.")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 

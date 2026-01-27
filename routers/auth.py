@@ -8,6 +8,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 import httpx
 from authlib.integrations.starlette_client import OAuth
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 import models
 import schemas
@@ -15,6 +17,9 @@ import auth as auth_module
 from database import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
+
+# Rate Limiter fuer Auth-Endpoints (Brute-Force-Schutz)
+limiter = Limiter(key_func=get_remote_address)
 
 # Google OAuth Setup
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -36,7 +41,8 @@ if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
 # === REGISTRIERUNG ===
 
 @router.post("/register", response_model=schemas.Token, status_code=status.HTTP_201_CREATED)
-async def register(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     """
     Registriert einen neuen User mit Email und Passwort.
     Gibt direkt einen JWT Token zurueck (auto-login nach Registrierung).
@@ -67,7 +73,8 @@ async def register(user_data: schemas.UserCreate, db: Session = Depends(get_db))
 # === LOGIN ===
 
 @router.post("/login", response_model=schemas.Token)
-async def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, credentials: schemas.UserLogin, db: Session = Depends(get_db)):
     """
     Login mit Email und Passwort.
     Gibt einen JWT Token zurueck.
